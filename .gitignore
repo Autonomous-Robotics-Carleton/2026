@@ -17,3 +17,8 @@ node_modules
 *.pem
 .env*.local
 .vercel
+.claude
+AGENTS.md
+.github/agents/
+.github/prompts/
+.github/skills/
