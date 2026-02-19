@@ -190,6 +190,17 @@
   animation: marquee 20s linear infinite;
 }
 
+/* ── Background Boxes ripple animation ── */
+@keyframes cell-ripple {
+  0%   { background-color: transparent; }
+  30%  { background-color: rgba(94, 196, 232, 0.40); }
+  100% { background-color: transparent; }
+}
+
+.bp-rippling {
+  animation: cell-ripple 1.2s ease-out var(--rd, 0ms) both;
+}
+
 /* Route transition overlay */
 .transition-overlay {
   transition: transform 800ms;
