@@ -3,64 +3,41 @@
 import Header from '@/components/layout/Header';
 import Footer from '@/components/layout/Footer';
 import ArcLogo from '@/components/ui/ArcLogo';
-import BlueprintGrid from '@/components/ui/BlueprintGrid';
-import WireframeCar from '@/components/ui/WireframeCar';
+import BackgroundBoxes from '@/components/ui/BackgroundBoxes';
 import CornerTicks from '@/components/ui/CornerTicks';
 import StackedLogos from '@/components/ui/StackedLogos';
 import { getSponsorLogo } from '@/components/ui/SponsorLogos';
-import { useScrollReveal } from '@/hooks/useScrollReveal';
-import { useParallax } from '@/hooks/useParallax';
 import { sponsors } from '@/data/sponsors';
 
-// Build logo groups: each column cycles through ALL sponsors
 function buildLogoGroups(columns: number) {
   const logos = sponsors.map((s) => getSponsorLogo(s.name));
   return Array.from({ length: columns }, () => logos);
 }
 
 export default function HomePage() {
-  const heroRef = useScrollReveal<HTMLDivElement>();
-  const identityRef = useScrollReveal<HTMLDivElement>({ delay: 0.1 });
-  const missionRef = useScrollReveal<HTMLDivElement>({ delay: 0.1 });
-  const sponsorsRef = useScrollReveal<HTMLDivElement>({ delay: 0.1 });
-  const carRef = useParallax<HTMLDivElement>({ speed: 0.15 });
-  const gridRef = useParallax<HTMLDivElement>({ speed: 0.05, direction: 'y' });
-
   const logoGroups = buildLogoGroups(4);
 
   return (
     <>
+      {/* ── Full-page interactive background (home / about us only) ── */}
+      <div className="fixed inset-0 -z-10 overflow-hidden pointer-events-none">
+        <BackgroundBoxes />
+      </div>
+
       <Header />
 
       <main>
         {/* ── Hero with large ARC logo ── */}
-        <section className="relative overflow-hidden px-6 pt-28 md:px-10 lg:px-16">
-          <div ref={gridRef} className="absolute inset-[-20px]">
-            <BlueprintGrid variant="hero" />
-          </div>
-          <div
-            ref={heroRef}
-            className="relative mx-auto max-w-[1440px] py-16 md:py-24 lg:py-32"
-          >
+        <section className="relative px-6 pt-28 md:px-10 lg:px-16">
+          <div className="mx-auto max-w-[1440px] py-16 md:py-24 lg:py-32">
             <ArcLogo className="h-20 w-auto text-white md:h-28 lg:h-36" />
-          </div>
-          {/* Wireframe car decoration */}
-          <div
-            ref={carRef}
-            className="pointer-events-none absolute right-4 bottom-8 z-[1] w-[260px] md:right-10 md:w-[380px] lg:right-16 lg:w-[500px]"
-          >
-            <WireframeCar />
           </div>
         </section>
 
         {/* ── Identity Section ── */}
         <section className="relative px-6 md:px-10 lg:px-16">
-          <BlueprintGrid variant="section" />
           <div className="mx-auto max-w-[1440px] py-16 md:py-20">
-            <div
-              ref={identityRef}
-              className="relative flex flex-col gap-6 md:flex-row md:items-start md:gap-16 lg:gap-24"
-            >
+            <div className="relative flex flex-col gap-6 md:flex-row md:items-start md:gap-16 lg:gap-24">
               <CornerTicks label="01" />
               <h2 className="shrink-0 text-3xl md:text-4xl lg:text-5xl">
                 IDENTITY
@@ -78,12 +55,8 @@ export default function HomePage() {
 
         {/* ── Mission Section ── */}
         <section className="relative px-6 md:px-10 lg:px-16">
-          <BlueprintGrid variant="section" />
           <div className="mx-auto max-w-[1440px] py-16 md:py-20">
-            <div
-              ref={missionRef}
-              className="relative flex flex-col gap-6 md:flex-row md:items-start md:gap-16 lg:gap-24"
-            >
+            <div className="relative flex flex-col gap-6 md:flex-row md:items-start md:gap-16 lg:gap-24">
               <CornerTicks label="02" />
               <h2 className="shrink-0 text-3xl md:text-4xl lg:text-5xl">
                 MISSION
@@ -100,9 +73,8 @@ export default function HomePage() {
 
         {/* ── Sponsors Section ── */}
         <section className="relative px-6 pb-24 md:px-10 md:pb-32 lg:px-16 lg:pb-40">
-          <BlueprintGrid variant="minimal" />
           <div className="mx-auto max-w-[1440px]">
-            <div ref={sponsorsRef} className="relative">
+            <div className="relative">
               <CornerTicks label="03" />
               <h2 className="text-3xl md:text-4xl lg:text-5xl">SPONSORS</h2>
               <div className="mt-12 text-fg/50 md:mt-16">
