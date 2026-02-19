@@ -32,8 +32,8 @@ export default function Header() {
               <li key={item.href}>
                 <TransitionLink
                   href={item.href}
-                  className={`group flex items-center gap-2.5 text-sm tracking-widest transition-opacity duration-200 ${
-                    active ? 'text-white' : 'text-white/60 hover:text-white'
+                  className={`group flex items-center gap-2.5 text-sm tracking-widest transition-colors duration-200 ${
+                    active ? 'text-accent' : 'text-fg/60 hover:text-accent/80'
                   }`}
                 >
                   <NavIcon filled={active} />
@@ -52,20 +52,20 @@ export default function Header() {
           aria-expanded={mobileOpen}
         >
           <span
-            className={`h-0.5 w-6 bg-white transition-transform ${mobileOpen ? 'translate-y-2 rotate-45' : ''}`}
+            className={`h-0.5 w-6 bg-accent transition-transform ${mobileOpen ? 'translate-y-2 rotate-45' : ''}`}
           />
           <span
-            className={`h-0.5 w-6 bg-white transition-opacity ${mobileOpen ? 'opacity-0' : ''}`}
+            className={`h-0.5 w-6 bg-accent transition-opacity ${mobileOpen ? 'opacity-0' : ''}`}
           />
           <span
-            className={`h-0.5 w-6 bg-white transition-transform ${mobileOpen ? '-translate-y-2 -rotate-45' : ''}`}
+            className={`h-0.5 w-6 bg-accent transition-transform ${mobileOpen ? '-translate-y-2 -rotate-45' : ''}`}
           />
         </button>
       </nav>
 
       {/* Mobile menu */}
       {mobileOpen && (
-        <div className="border-t border-white/10 bg-black px-6 pb-8 pt-4 md:hidden">
+        <div className="border-t border-bp-line bg-bp-blue-dark px-6 pb-8 pt-4 md:hidden">
           <ul className="flex flex-col gap-6">
             {NAV_ITEMS.map((item) => {
               const active = pathname === item.href;
@@ -74,7 +74,7 @@ export default function Header() {
                   <TransitionLink
                     href={item.href}
                     className={`flex items-center gap-2.5 text-sm tracking-widest ${
-                      active ? 'text-white' : 'text-white/60'
+                      active ? 'text-accent' : 'text-fg/60'
                     }`}
                     onClick={() => setMobileOpen(false)}
                   >

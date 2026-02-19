@@ -15,10 +15,10 @@ export default function Button({
   ...props
 }: ButtonProps) {
   const base =
-    'inline-flex items-center gap-2 px-6 py-3 text-sm font-medium uppercase tracking-wider transition-colors duration-200 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white';
+    'inline-flex items-center gap-2 px-6 py-3 text-sm font-medium uppercase tracking-wider transition-all duration-200 bp-focus';
   const variants = {
-    primary: 'bg-white text-black hover:bg-white/90',
-    outline: 'border border-white/30 text-white hover:border-white hover:bg-white/5',
+    primary: 'bg-accent text-bp-blue-dark hover:bg-bp-cyan bp-glow',
+    outline: 'border border-bp-line text-fg hover:border-accent/40 hover:bg-accent/5 bp-glow-hover',
   };
   const classes = `${base} ${variants[variant]} ${className}`;
 

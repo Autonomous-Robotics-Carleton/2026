@@ -135,7 +135,7 @@ export function TransitionProvider({ children }: TransitionProviderProps) {
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          backgroundColor: '#000',
+          backgroundColor: 'var(--color-bp-blue-dark)',
           transform: isDown ? 'translateY(0%)' : 'translateY(-100%)',
           transition: 'transform 800ms',
           transitionTimingFunction: phase === 'covering' ? 'ease-in' : 'ease-out',

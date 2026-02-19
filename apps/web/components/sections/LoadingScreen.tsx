@@ -66,7 +66,7 @@ export default function LoadingScreen() {
   return (
     <div
       ref={containerRef}
-      className="fixed inset-0 z-[101] flex items-center justify-center bg-black"
+      className="fixed inset-0 z-[101] flex items-center justify-center bg-bp-blue-dark"
     >
       <div className="flex items-center gap-6 md:gap-10">
         <ArcLogo className="h-10 w-auto text-white md:h-14" />
@@ -77,13 +77,13 @@ export default function LoadingScreen() {
           }`}
         >
           <p
-            className="whitespace-nowrap text-sm tracking-widest text-white md:text-base"
+            className="whitespace-nowrap text-sm tracking-widest text-fg md:text-base"
             style={{ fontFamily: 'var(--font-body)' }}
           >
             FULL SPEED. NO HANDS.
           </p>
           <p
-            className="mt-1 flex justify-between text-xs tracking-widest text-white/60 md:text-sm"
+            className="mt-1 flex justify-between text-xs tracking-widest text-accent/60 md:text-sm"
             style={{ fontFamily: 'var(--font-mono)' }}
           >
             <span>LOADING&hellip;</span>
