@@ -1,0 +1,151 @@
+/* ── Scrollable wrapper ── */
+.wrapper {
+  position: relative;
+  height: 400vh;
+}
+
+/* ── Sticky viewport + blueprint grid background ── */
+.sticky {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: hidden;
+  background-color: #1a2f4a;
+  background-image:
+    repeating-linear-gradient(0deg,  rgba(94,196,232,0.20) 0px, rgba(94,196,232,0.20) 1px, transparent 1px, transparent 120px),
+    repeating-linear-gradient(90deg, rgba(94,196,232,0.20) 0px, rgba(94,196,232,0.20) 1px, transparent 1px, transparent 120px),
+    repeating-linear-gradient(0deg,  rgba(94,196,232,0.07) 0px, rgba(94,196,232,0.07) 1px, transparent 1px, transparent 30px),
+    repeating-linear-gradient(90deg, rgba(94,196,232,0.07) 0px, rgba(94,196,232,0.07) 1px, transparent 1px, transparent 30px);
+}
+
+/* ── Paper noise ── */
+.noise {
+  position: absolute;
+  inset: 0;
+  opacity: 0.038;
+  pointer-events: none;
+  z-index: 100;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 256px 256px;
+  mix-blend-mode: overlay;
+}
+
+/* ── Vignette: light centre glow + restrained dark edge ── */
+.vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 99;
+  background:
+    radial-gradient(closest-side at 50% 50%, rgba(255,255,255,0.05) 0%, rgba(0,0,0,0) 60%),
+    radial-gradient(ellipse at center, transparent 35%, rgba(19,36,64,0.45) 100%);
+}
+
+/* ── Stage fills the sticky viewport ── */
+.stage {
+  position: absolute;
+  inset: 0;
+  transform-style: preserve-3d;
+}
+
+/* ── Camera wrapper — GSAP animates scale/rotateZ/y for parallax ── */
+.camera {
+  position: absolute;
+  inset: 0;
+  will-change: transform;
+  transform-style: preserve-3d;
+}
+
+/* ── Per-part wrapper — GSAP controls x/y/scale/opacity/filter ── */
+.part {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  will-change: transform, opacity, filter;
+  pointer-events: none;
+  user-select: none;
+}
+
+/* ── car.png: solid blueprint bg → screen blend merges it with ours ── */
+.carImg {
+  display: block;
+  width: clamp(260px, 44vw, 640px);
+  height: auto;
+  mix-blend-mode: screen;
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+/* ── Isolated part PNGs ──
+   CSS primary approach for checkerboard removal:
+   mix-blend-mode: screen removes dark areas; saturate(0) neutralises colour cast.
+   If checkerboard is baked-in gray (not alpha), enable USE_CANVAS_KEYOUT in component.
+── */
+.partImg {
+  display: block;
+  height: auto;
+  mix-blend-mode: screen;
+  filter: saturate(0.15) brightness(1.35) contrast(1.4);
+  pointer-events: none;
+  -webkit-user-drag: none;
+}
+
+/* ── HUD ── */
+.hudBL {
+  position: absolute;
+  bottom: 2rem;
+  left: 2rem;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.hudTitle {
+  font-family: 'Chakra Petch', sans-serif;
+  font-weight: 700;
+  font-style: italic;
+  font-size: clamp(0.6rem, 1.1vw, 0.8rem);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(94,196,232,0.72);
+}
+
+.hudSub {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(0.5rem, 0.85vw, 0.65rem);
+  letter-spacing: 0.1em;
+  color: rgba(94,196,232,0.36);
+}
+
+.hudTR {
+  position: absolute;
+  top: 1.75rem;
+  right: 2rem;
+  z-index: 50;
+}
+
+.hudTRText {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(0.5rem, 0.85vw, 0.65rem);
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: rgba(94,196,232,0.3);
+}
+
+.hudBeat {
+  position: absolute;
+  bottom: 2rem;
+  right: 2rem;
+  z-index: 50;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: clamp(0.5rem, 0.85vw, 0.65rem);
+  letter-spacing: 0.12em;
+  color: rgba(94,196,232,0.5);
+}
+
+@media (max-width: 768px) {
+  .hudBL   { bottom: 1.25rem; left: 1rem; }
+  .hudTR   { top: 1.25rem;   right: 1rem; }
+  .hudBeat { bottom: 1.25rem; right: 1rem; }
+}
