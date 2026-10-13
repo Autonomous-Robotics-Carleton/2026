@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ARC Ground Station</title>
+<style>
+  :root {
+    --bg: #f4f4f2; --grid: #dcdcd8; --axis: #b4b4ae; --text: #222; --muted: #6b6b66;
+    --wall: #2b2b2e; --car: #d2452d; --ghost: #2d6fd2; --trail: rgba(210, 69, 45, 0.35); --panel: rgba(255, 255, 255, 0.92);
+    --real: #ffffff; --real-edge: #1a1a1a; --trail-real: rgba(60, 60, 60, 0.35);
+    --ok: #2f8a3e; --warn: #b7791f; --bad: #c0392b; --btn: #e6e6e2; --line: #d0d0cb;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #17181a; --grid: #26282b; --axis: #3a3d42; --text: #e8e8e6; --muted: #9a9a95;
+      --wall: #b9bbc0; --car: #ff6a4d; --ghost: #5b9bff; --trail: rgba(255, 106, 77, 0.35); --panel: rgba(30, 31, 34, 0.92);
+      --real: #ffffff; --real-edge: #000000; --trail-real: rgba(255, 255, 255, 0.35);
+      --ok: #5cc26d; --warn: #e0a84a; --bad: #ff6a5c; --btn: #2c2e32; --line: #3a3d42;
+    }
+  }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
+    font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; cursor: grab; touch-action: none; }
+  canvas.dragging { cursor: grabbing; }
+  #panel { position: fixed; top: 12px; left: 12px; background: var(--panel); padding: 8px 12px;
+    border-radius: 6px; width: 260px; max-width: calc(100vw - 48px); max-height: calc(100vh - 40px); overflow: auto; }
+  #panel b { font-weight: 600; }
+  .row { display: flex; justify-content: space-between; gap: 12px; }
+  .row > span:last-child { text-align: right; }
+  .muted { color: var(--muted); }
+  .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
+  .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+  label { display: block; margin-top: 6px; cursor: pointer; user-select: none; }
+  details { border-top: 1px solid var(--line); padding: 4px 0; }
+  summary { cursor: pointer; font-weight: 600; user-select: none; padding: 2px 0; }
+  button { font: inherit; color: var(--text); background: var(--btn); border: 1px solid var(--line);
+    border-radius: 4px; padding: 3px 8px; cursor: pointer; }
+  button.on { background: var(--ghost); border-color: var(--ghost); color: #fff; }
+  button.danger { background: var(--bad); border-color: var(--bad); color: #fff; }
+  input[type=text], input[type=number], select { font: inherit; color: var(--text); background: var(--bg);
+    border: 1px solid var(--line); border-radius: 4px; padding: 2px 4px; width: 7em; }
+  .seg { display: flex; gap: 4px; }
+  .field { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; }
+  #cutoff { width: 100%; margin-top: 6px; }
+  #log { margin-top: 4px; max-height: 8.5em; overflow: auto; font-size: 11px; white-space: pre; color: var(--muted); }
+  .sub { margin-top: 6px; font-size: 11px; color: var(--muted); }
+  #driving { padding: 0 4px; border-radius: 3px; }
+  #driving.active { background: var(--ok); color: #fff; }
+  /* Real mode with no car: a centred card over the canvas, never auto-dismissed. */
+  #nocar { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--panel);
+    border: 2px solid var(--bad); border-radius: 8px; padding: 16px 20px; text-align: center;
+    width: 300px; max-width: calc(100vw - 64px); display: none; }
+  #nocar h2 { margin: 0 0 6px; font-size: 18px; color: var(--bad); }
+  #nocar .field { justify-content: center; }
+  #toast { position: fixed; right: 12px; bottom: 12px; background: var(--panel); border: 1px solid var(--ok);
+    border-radius: 6px; padding: 8px 10px; display: none; align-items: center; gap: 10px; max-width: calc(100vw - 48px); }
+  #banner { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); background: var(--warn); color: #000;
+    border-radius: 6px; padding: 6px 12px; display: none; max-width: calc(100vw - 48px); text-align: center; }
+</style>
+</head>
+<body>
+<canvas id="c"></canvas>
+
+<div id="panel">
+  <div class="row"><b>ARC ground station</b><span id="driving" class="muted">idle</span></div>
+
+  <details open>
+    <summary>Status</summary>
+    <div class="row"><span>server</span><span id="serverWs" class="muted">connecting</span></div>
+    <div class="row"><span>helper</span><span id="helperWs" class="muted">connecting</span></div>
+    <div class="row"><span>mode</span><span id="mode">-</span></div>
+    <div class="row"><span>link</span><span id="conn">-</span></div>
+    <div class="row" id="simRow"><span>sim</span><span id="simState">-</span></div>
+    <div class="row"><span>track</span><span id="track">none</span></div>
+  </details>
+
+  <details open>
+    <summary>Car</summary>
+    <div class="row"><span>source</span><span id="source">-</span></div>
+    <div class="row"><span><span class="sw" id="carSw" style="background:var(--car)"></span><span id="poseLabel">pose</span></span><span id="pose">-</span></div>
+    <div id="simOnly">
+      <div class="row"><span><span class="sw" style="background:var(--ghost)"></span>odom</span><span id="odom">-</span></div>
+      <div class="row"><span>odom error</span><span id="err">-</span></div>
+      <label><input type="checkbox" id="ghost" checked> show ghost (odom estimate)</label>
+    </div>
+  </details>
+
+  <details open>
+    <summary>Heartbeat</summary>
+    <div class="sub">sent by this ground station</div>
+    <div class="row"><span>sending</span><span id="hbSending">-</span></div>
+    <div class="row"><span>reason</span><span id="hbReason">-</span></div>
+    <div class="row"><span>heartbeats/s</span><span id="hbRate">-</span></div>
+    <div class="row"><span>last seq</span><span id="hbSeq">-</span></div>
+    <button id="cutoff">Test heartbeat cutoff</button>
+    <div class="sub">reported by the <span id="reporter">car</span></div>
+    <div class="row"><span>heartbeat age</span><span id="lkHb">-</span></div>
+    <div class="row"><span>teleop age</span><span id="lkTe">-</span></div>
+    <div class="row"><span>stopping</span><span id="lkStop">-</span></div>
+    <div class="row"><span>reason</span><span id="lkReason">-</span></div>
+    <div class="sub">log</div>
+    <div id="log"></div>
+  </details>
+
+  <details id="settings">
+    <summary>Settings</summary>
+    <div class="field"><span>source</span>
+      <span class="seg"><button id="setSim">sim</button><button id="setReal">real</button></span></div>
+    <div class="field"><span>sim track</span><select id="trackIn"><option>oval</option></select></div>
+    <div class="field"><span>camera</span><span id="camMode" class="muted">following car</span></div>
+    <button id="recenter" style="width:100%;margin-top:6px">Center camera back on car</button>
+    <div class="field"><span>max speed m/s</span><input type="number" id="maxSpeed" value="1.0" min="0" max="10" step="0.1"></div>
+    <div class="sub">drive: W/S or up/down, steer A/D or left/right; gamepad left stick + triggers</div>
+  </details>
+  <div class="muted" style="margin-top:6px">scroll to zoom · grid 1 m</div>
+</div>
+
+<div id="nocar">
+  <h2>No car found</h2>
+  <div class="muted">Real mode: waiting for the car to answer. This page keeps trying; it will not switch on its own.</div>
+  <div class="field"><span>sim track</span><select id="trackIn2"><option>oval</option></select></div>
+  <div style="margin-top:10px"><button id="toSim">Switch to sim</button></div>
+</div>
+
+<div id="toast"><span>Live car found — switch to real in Settings</span><button id="toastOpen">Settings</button><button id="toastX" title="dismiss">x</button></div>
+<div id="banner"></div>
+
+<script>
+// Car outline in base_link (rear axle, x forward), metres. Placeholder racecar.xacro size.
+const CAR = { back: -0.06, front: 0.40, half: 0.12 };
+const TRAIL_SECONDS = 30;
+const MAX_STEER = 0.4189;       // rad, car_link clamps to this too
+const DEADZONE = 0.1;
+const HB_MS = 50;               // page -> helper heartbeat; helper stops after 0.15 s without one
+const TELEOP_MS = 20;           // 50 Hz
+const TELEOP_TAIL_MS = 200;     // keep sending zeros this long after release so the stop is explicit
+const LOG_LINES = 50;
+
+const $ = (id) => document.getElementById(id);
+const canvas = $('c');
+const ctx = canvas.getContext('2d');
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const clock = () => new Date().toTimeString().slice(0, 8);
+const setText = (id, text, cls) => { const el = $(id); el.textContent = text; el.className = cls || ''; };
+
+let scale = 120; // px per metre
+let state = null; // latest bridge `state` message
+let link = null;  // latest server `link` message
+let trail = [];
+let trailKey = null; // which pose the trail follows; reset when it changes so we don't draw a jump
+let track = null; // {resolution, origin: [x, y, yaw], width, height, name, img}
+
+// ---------- track ----------
+// The server sends the walls as an alpha mask; tint it with --wall (redone if the theme flips).
+let trackMask = null, trackMeta = null, trackLoads = 0;
+function tintTrack() {
+  if (!trackMask || !trackMeta) return;
+  const c = document.createElement('canvas');
+  c.width = trackMeta.width; c.height = trackMeta.height;
+  const g = c.getContext('2d');
+  g.drawImage(trackMask, 0, 0);
+  g.globalCompositeOperation = 'source-in';
+  g.fillStyle = css('--wall'); g.fillRect(0, 0, c.width, c.height);
+  track = { ...trackMeta, img: c };
+}
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', tintTrack);
+
+async function loadTrack(meta, png) {
+  const n = ++trackLoads; // a newer `track` message wins over a slow older decode
+  if (!meta) { track = trackMeta = trackMask = null; $('track').textContent = 'none'; return; }
+  if (!png) { $('track').textContent = `${meta.name || 'unnamed'} (no image)`; return; }
+  // The image arrives inside the message (base64), so no separate HTTP request can fail.
+  const mask = new Image();
+  try {
+    await new Promise((ok, fail) => { mask.onload = ok; mask.onerror = fail; mask.src = `data:image/png;base64,${png}`; });
+  } catch {
+    if (n !== trackLoads) return;
+    $('track').textContent = `${meta.name || 'unnamed'} (image failed)`;
+    logLine(`track image failed to decode: ${meta.name || 'unnamed'}`);
+    return;
+  }
+  if (n !== trackLoads) return;
+  trackMeta = meta; trackMask = mask;
+  tintTrack();
+  $('track').textContent = meta.name || 'unnamed';
+}
+
+// ---------- canvas ----------
+function resize() {
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = innerWidth * dpr; canvas.height = innerHeight * dpr;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+addEventListener('resize', resize); resize();
+addEventListener('wheel', (e) => {
+  if (e.target !== canvas) return; // let the panel and its log scroll normally
+  scale = Math.min(800, Math.max(10, scale * Math.exp(-e.deltaY * 0.001)));
+}, { passive: true });
+
+// Drag to pan. Panning detaches the camera from the car until "Center camera back on car".
+let cam = null; // null: follow the drawn car; {x, y}: fixed world point at the screen centre
+let drag = null;
+function setCam(c) {
+  cam = c;
+  $('camMode').textContent = cam ? 'free (dragged)' : 'following car';
+}
+canvas.addEventListener('pointerdown', (e) => {
+  if (e.button !== 0) return;
+  const car = drawnPose();
+  if (!cam) setCam(car ? { x: car.x, y: car.y } : { x: 0, y: 0 });
+  drag = { x: e.clientX, y: e.clientY };
+  canvas.setPointerCapture(e.pointerId);
+  canvas.classList.add('dragging');
+});
+canvas.addEventListener('pointermove', (e) => {
+  if (!drag) return;
+  // Screen y points down, world y up.
+  cam.x -= (e.clientX - drag.x) / scale;
+  cam.y += (e.clientY - drag.y) / scale;
+  drag = { x: e.clientX, y: e.clientY };
+});
+const endDrag = () => { drag = null; canvas.classList.remove('dragging'); };
+canvas.addEventListener('pointerup', endDrag);
+canvas.addEventListener('pointercancel', endDrag);
+
+// ---------- server websocket ----------
+let serverWs = null;
+function sendServer(msg) {
+  if (serverWs && serverWs.readyState === WebSocket.OPEN) serverWs.send(JSON.stringify(msg));
+}
+function connectServer() {
+  const ws = new WebSocket(`ws://${location.host}/ws`);
+  serverWs = ws;
+  ws.onopen = () => setText('serverWs', 'live', 'ok');
+  ws.onclose = () => {
+    setText('serverWs', 'reconnecting', 'bad');
+    // Without the server we know nothing about the car: drop stale pose and stop the helper's UDP.
+    state = null; link = null; onLink();
+    setTimeout(connectServer, 1000);
+  };
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'state') onState(msg);
+    else if (msg.type === 'link') { link = msg; onLink(); }
+    else if (msg.type === 'track') loadTrack(msg.meta, msg.png);
+    else if (msg.type === 'tracks') setTracks(msg.names, msg.selected);
+  };
+}
+
+function onState(msg) {
+  state = msg;
+  const p = drawnPose();
+  if (!p) return;
+  const key = `${msg.source}/${simMode() ? 'truth' : 'estimate'}`;
+  if (key !== trailKey) { trail = []; trailKey = key; }
+  const now = performance.now() / 1000;
+  trail.push([p.x, p.y, now]);
+  while (trail.length && now - trail[0][2] > TRAIL_SECONDS) trail.shift();
+}
+
+const simMode = () => !!link && link.mode === 'sim';
+// Sim: draw ground truth (ghost = estimate). Real: no truth exists, so draw the car's own estimate.
+const drawnPose = () => state ? (simMode() ? state.truth : state.estimate) || null : null;
+
+let lastCarFound = false;
+let lastUdpKey = undefined;
+function onLink() {
+  const l = link;
+  setText('mode', l ? l.mode : '-');
+  setText('conn', !l ? '-' : l.connected ? 'connected' : 'not connected', !l ? '' : l.connected ? 'ok' : 'bad');
+  setText('simState', l ? l.sim : '-', l && l.sim === 'running' ? 'ok' : l && l.sim === 'starting' ? 'warn' : 'muted');
+  $('setSim').classList.toggle('on', !!l && l.mode === 'sim');
+  $('setReal').classList.toggle('on', !!l && l.mode === 'real');
+  $('simOnly').style.display = simMode() ? '' : 'none';
+  $('reporter').textContent = simMode() ? 'sim (car_link)' : 'car';
+  if (l && !l.connected) state = null; // no bridge, so the last pose is stale
+
+  // Real mode with no car: say so prominently, but only the user switches back to sim.
+  $('nocar').style.display = l && l.mode === 'real' && !l.connected ? 'block' : 'none';
+
+  // Toast only on the rising edge, and only while we're in sim (in real it's already in use).
+  const found = !!l && !!l.car_found;
+  if (found && !lastCarFound && simMode()) $('toast').style.display = 'flex';
+  if (!found || (l && l.mode === 'real')) $('toast').style.display = 'none';
+  lastCarFound = found;
+
+  // Tell the helper where to send UDP, but only when it changes.
+  const udp = l ? l.udp : null;
+  const key = JSON.stringify(udp || null);
+  if (key !== lastUdpKey) { lastUdpKey = key; sendTarget(); }
+}
+
+function sendTarget() {
+  const udp = link ? link.udp : null;
+  sendHelper(udp ? { type: 'target', host: udp.host, port: udp.port } : { type: 'target', host: null });
+}
+
+function switchMode(mode, trackInput) {
+  if (mode === 'sim') {
+    const name = (trackInput || $('trackIn')).value;
+    sendServer({ type: 'sim', track: name || null }); // before the switch so the sim starts on it
+  }
+  sendServer({ type: 'switch', mode });
+}
+$('setSim').onclick = () => switchMode('sim');
+$('setReal').onclick = () => switchMode('real');
+$('toSim').onclick = () => switchMode('sim', $('trackIn2'));
+$('trackIn').onchange = () => { $('trackIn2').value = $('trackIn').value; };
+$('trackIn2').onchange = () => { $('trackIn').value = $('trackIn2').value; };
+
+// The server lists the bundled tracks, so only a track that exists can be picked.
+function setTracks(names, selected) {
+  for (const id of ['trackIn', 'trackIn2']) {
+    const sel = $(id);
+    sel.replaceChildren(...names.map((n) => new Option(n, n)));
+    sel.value = names.includes(selected) ? selected : names[0];
+  }
+}
+$('recenter').onclick = () => setCam(null);
+$('toastX').onclick = () => { $('toast').style.display = 'none'; };
+$('toastOpen').onclick = () => { $('settings').open = true; $('toast').style.display = 'none'; };
+
+// ---------- helper websocket ----------
+let helperWs = null;
+let cutoffOn = false;
+let lastSent = null; // previous `sent` report, to log only the changes
+function sendHelper(msg) {
+  if (helperWs && helperWs.readyState === WebSocket.OPEN) helperWs.send(JSON.stringify(msg));
+}
+function connectHelper() {
+  const ws = new WebSocket('ws://localhost:8081');
+  helperWs = ws;
+  ws.onopen = () => {
+    setText('helperWs', 'live', 'ok');
+    logLine('helper connected');
+    sendTarget(); // a restarted helper knows nothing; give it the target straight away
+  };
+  ws.onclose = () => {
+    if (lastSent !== 'down') logLine('helper disconnected');
+    lastSent = 'down';
+    setText('helperWs', 'reconnecting', 'bad');
+    setText('hbSending', 'no (no helper)', 'bad');
+    setTimeout(connectHelper, 1000);
+  };
+  ws.onmessage = (e) => {
+    const msg = JSON.parse(e.data);
+    if (msg.type === 'sent') onSent(msg);
+  };
+}
+
+function onSent(m) {
+  setText('hbSending', m.sending ? 'yes' : 'no', m.sending ? 'ok' : 'bad');
+  setText('hbReason', m.reason, m.reason === 'ok' ? '' : 'warn');
+  setText('hbRate', String(m.count * 5)); // reports are 5 Hz, count is per report
+  setText('hbSeq', String(m.last_seq));
+  cutoffOn = !!m.cutoff; // the helper's view is the truth for the button
+  renderCutoff();
+  const now = `${m.sending}/${m.reason}`;
+  if (now !== lastSent) logLine(m.sending ? 'sending' : `stopped: ${m.reason}`);
+  lastSent = now;
+}
+
+function logLine(text) {
+  const log = $('log');
+  const lines = log.textContent ? log.textContent.split('\n') : [];
+  lines.push(`${clock()} ${text}`);
+  log.textContent = lines.slice(-LOG_LINES).join('\n');
+  log.scrollTop = log.scrollHeight;
+}
+
+function renderCutoff() {
+  const b = $('cutoff');
+  b.textContent = cutoffOn ? 'Cutoff active — resume heartbeat' : 'Test heartbeat cutoff';
+  b.classList.toggle('danger', cutoffOn);
+}
+$('cutoff').onclick = () => {
+  cutoffOn = !cutoffOn; // optimistic; the next `sent` report confirms it
+  sendHelper({ type: 'cutoff', on: cutoffOn });
+  renderCutoff();
+};
+
+// Page heartbeat: the helper only sends UDP heartbeats while these keep arriving.
+let hbSeq = 0;
+setInterval(() => { sendHelper({ type: 'hb', seq: hbSeq++ }); }, HB_MS);
+
+// ---------- teleop ----------
+const keys = new Set();
+const DRIVE_KEYS = { w: 1, s: 1, a: 1, d: 1, arrowup: 1, arrowdown: 1, arrowleft: 1, arrowright: 1 };
+const typing = (e) => {
+  const t = e.target;
+  return t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA' || t.tagName === 'SELECT' || t.isContentEditable);
+};
+addEventListener('keydown', (e) => {
+  const k = e.key.toLowerCase();
+  if (typing(e) || !DRIVE_KEYS[k] || e.metaKey || e.ctrlKey || e.altKey) return;
+  keys.add(k); e.preventDefault(); // arrows would otherwise scroll the panel
+});
+addEventListener('keyup', (e) => { keys.delete(e.key.toLowerCase()); });
+// A key released while the window is unfocused never sends keyup: drop everything so the car stops.
+addEventListener('blur', () => keys.clear());
+
+const dz = (v) => (Math.abs(v) < DEADZONE ? 0 : v);
+function gamepadInput() {
+  for (const gp of navigator.getGamepads ? navigator.getGamepads() : []) {
+    if (!gp) continue;
+    const steer = dz(-(gp.axes[0] || 0)); // stick left is negative; + steer is left
+    const rt = gp.buttons[7] ? gp.buttons[7].value : 0, lt = gp.buttons[6] ? gp.buttons[6].value : 0;
+    let throttle = dz(rt) - dz(lt);
+    if (!throttle) throttle = dz(-(gp.axes[3] || 0)); // right stick Y as the alternative, up = forward
+    if (steer || throttle) return { throttle, steer };
+  }
+  return null;
+}
+
+function maxSpeed() {
+  const v = parseFloat($('maxSpeed').value);
+  return Number.isFinite(v) && v >= 0 ? v : 1.0;
+}
+
+let lastActive = -Infinity;
+setInterval(() => {
+  let throttle = 0, steer = 0, active = false;
+  if (keys.size) {
+    throttle = (keys.has('w') || keys.has('arrowup') ? 1 : 0) - (keys.has('s') || keys.has('arrowdown') ? 1 : 0);
+    steer = (keys.has('a') || keys.has('arrowleft') ? 1 : 0) - (keys.has('d') || keys.has('arrowright') ? 1 : 0);
+    active = true;
+  } else {
+    const g = gamepadInput();
+    if (g) { throttle = g.throttle; steer = g.steer; active = true; }
+  }
+  const now = performance.now();
+  if (active) lastActive = now;
+  else if (now - lastActive > TELEOP_TAIL_MS) { setDriving(false); return; } // idle: send nothing
+  const speed = active ? throttle * maxSpeed() : 0;
+  const steerRad = active ? Math.max(-1, Math.min(1, steer)) * MAX_STEER : 0;
+  sendHelper({ type: 'teleop', speed, steer: steerRad });
+  setDriving(active);
+}, TELEOP_MS);
+
+let drivingShown = null;
+function setDriving(on) {
+  if (on === drivingShown) return;
+  drivingShown = on;
+  const el = $('driving');
+  el.textContent = on ? 'driving' : 'idle';
+  el.className = on ? 'active' : 'muted';
+}
+
+// ---------- hidden tab ----------
+// Browsers throttle timers in hidden tabs, so page heartbeats stop and the car stops by design.
+let hiddenAt = null, bannerTimer = null;
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden) { hiddenAt = performance.now(); keys.clear(); return; }
+  if (hiddenAt === null) return;
+  const secs = ((performance.now() - hiddenAt) / 1000).toFixed(1);
+  hiddenAt = null;
+  const b = $('banner');
+  b.textContent = `Heartbeat paused while this tab was hidden (${secs} s); the car stops without it.`;
+  b.style.display = 'block';
+  clearTimeout(bannerTimer);
+  bannerTimer = setTimeout(() => { b.style.display = 'none'; }, 4000);
+});
+
+// ---------- drawing ----------
+const fmt = (p) => p ? `${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${(p.yaw * 180 / Math.PI).toFixed(0)}°` : '-';
+const ms = (s) => (s === null || s === undefined ? '-' : `${Math.round(s * 1000)} ms`);
+
+function drawCar(p, fill, stroke, dashed) {
+  ctx.save();
+  ctx.translate(p.x, p.y); ctx.rotate(p.yaw);
+  ctx.beginPath();
+  ctx.moveTo(CAR.back, -CAR.half); ctx.lineTo(CAR.front - 0.08, -CAR.half);
+  ctx.lineTo(CAR.front, 0); ctx.lineTo(CAR.front - 0.08, CAR.half);
+  ctx.lineTo(CAR.back, CAR.half); ctx.closePath();
+  if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+  ctx.setLineDash(dashed ? [0.04, 0.03] : []);
+  ctx.lineWidth = 2 / scale; ctx.strokeStyle = stroke; ctx.stroke();
+  ctx.restore();
+}
+
+function frame() {
+  const w = innerWidth, h = innerHeight;
+  const sim = simMode();
+  const car = drawnPose();
+  const ghost = sim && state ? state.estimate : null;
+  // Colour follows who produced the data: red for the sim, white (dark outline) for the real car.
+  const fromSim = state ? state.source === 'sim' : sim;
+  const fill = css(fromSim ? '--car' : '--real'), edge = css(fromSim ? '--car' : '--real-edge');
+  ctx.fillStyle = css('--bg'); ctx.fillRect(0, 0, w, h);
+
+  // World to screen: follow the drawn car unless dragged, x right, y up.
+  const cx = cam ? cam.x : car ? car.x : 0, cy = cam ? cam.y : car ? car.y : 0;
+  ctx.save();
+  ctx.translate(w / 2, h / 2); ctx.scale(scale, -scale); ctx.translate(-cx, -cy);
+
+  // 1 m grid over the visible area, axes through the origin.
+  const hw = w / 2 / scale, hh = h / 2 / scale;
+  ctx.lineWidth = 1 / scale; ctx.setLineDash([]);
+  for (let x = Math.floor(cx - hw); x <= cx + hw; x++) {
+    ctx.strokeStyle = css(x === 0 ? '--axis' : '--grid');
+    ctx.beginPath(); ctx.moveTo(x, cy - hh); ctx.lineTo(x, cy + hh); ctx.stroke();
+  }
+  for (let y = Math.floor(cy - hh); y <= cy + hh; y++) {
+    ctx.strokeStyle = css(y === 0 ? '--axis' : '--grid');
+    ctx.beginPath(); ctx.moveTo(cx - hw, y); ctx.lineTo(cx + hw, y); ctx.stroke();
+  }
+
+  // Track: the image's bottom-left corner sits at origin; pixel rows run top to bottom.
+  if (track) {
+    const [ox, oy, oyaw] = track.origin, r = track.resolution;
+    ctx.save();
+    ctx.translate(ox, oy); ctx.rotate(oyaw);
+    ctx.translate(0, track.height * r); ctx.scale(r, -r);
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(track.img, 0, 0);
+    ctx.restore();
+  }
+
+  if (trail.length > 1) {
+    ctx.strokeStyle = css(fromSim ? '--trail' : '--trail-real'); ctx.lineWidth = 2 / scale; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(trail[0][0], trail[0][1]);
+    for (const [x, y] of trail) ctx.lineTo(x, y);
+    ctx.stroke();
+  }
+
+  if (car) drawCar(car, fill, edge, false);
+  if (ghost && $('ghost').checked) drawCar(ghost, null, css('--ghost'), true);
+  ctx.restore();
+
+  // Panel readouts.
+  setText('source', state ? state.source : '-');
+  $('carSw').style.background = fill;
+  $('carSw').style.outline = fromSim ? '' : `1px solid ${edge}`;
+  $('poseLabel').textContent = sim ? 'true' : 'odom';
+  setText('pose', fmt(car));
+  if (sim) {
+    setText('odom', fmt(ghost));
+    setText('err', car && ghost ? `${Math.hypot(car.x - ghost.x, car.y - ghost.y).toFixed(3)} m` : '-');
+  }
+  const lk = state ? state.link : null;
+  setText('lkHb', lk ? ms(lk.heartbeat_age) : '-');
+  setText('lkTe', lk ? ms(lk.teleop_age) : '-');
+  setText('lkStop', lk ? (lk.stopping ? 'yes' : 'no') : '-', lk ? (lk.stopping ? 'bad' : 'ok') : '');
+  setText('lkReason', lk ? lk.reason : '-', lk && lk.reason !== 'ok' ? 'warn' : '');
+  requestAnimationFrame(frame);
+}
+
+onLink();
+renderCutoff();
+connectServer();
+connectHelper();
+requestAnimationFrame(frame);
+</script>
+</body>
+</html>
