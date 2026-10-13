@@ -47,18 +47,37 @@ jobs:
           echo "projects= $projects" >> "$GITHUB_OUTPUT"
 
       - name: Lint, test, check and build affected projects
-        run: npx nx affected -t lint test check build
+        # firmware and ROS need the dev container's toolchains: the dev-container job below
+        run: npx nx affected -t lint test check build --exclude='tag:env:dev-container'
+
+      # The two checkers from anishathalye/proof-html, run on the runner. As a
+      # Docker action, its image was pulled from Docker Hub at the start of every
+      # run, and failed when the runners hit the anonymous pull rate limit.
+      - name: Set up Ruby
+        if: contains(steps.affected.outputs.projects, ' systems ')
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.4'
 
       - name: Check HTML in systems/
         if: contains(steps.affected.outputs.projects, ' systems ')
-        uses: anishathalye/proof-html@v2
-        with:
-          directory: ./systems
-          check_favicon: false # standalone pages, not a site
-          # rel="preconnect" hints: the bare origins return 404 by design
-          ignore_url: |
-            https://fonts.googleapis.com
-            https://fonts.gstatic.com
+        run: |
+          failed=0
+          # HTML and CSS validation, on the runner's Java
+          npx --yes vnu-jar@26.9.16 --errors-only --skip-non-html --also-check-css systems || failed=1
+          # Links, images, scripts and Open Graph tags; three tries, as external links can be flaky
+          gem install --no-document html-proofer -v 5.2.1
+          for try in 1 2 3; do
+            # rel="preconnect" hints: the bare font origins return 404 by design
+            htmlproofer systems \
+              --checks Links,Images,Scripts,OpenGraph \
+              --no-ignore-empty-alt \
+              --ignore-urls https://fonts.googleapis.com,https://fonts.gstatic.com \
+              --typhoeus '{"followlocation":true,"connecttimeout":30,"timeout":120,"headers":{"User-Agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/87.0.0.0 Safari/537.36"}}' \
+              && break
+            if [ "$try" = 3 ]; then failed=1; else sleep 5; fi
+          done
+          exit $failed
 
       # Publish the docs image only on pushes to main that change the docs
       - name: Log in to GHCR
@@ -89,3 +108,111 @@ jobs:
           method: 'GET'
           timeout: 60000 # 60 seconds
           customHeaders: '{"Authorization": "Bearer ${{ secrets.WATCHTOWER_TOKEN }}"}'
+
+  dev-image:
+    # The dev container image (ADR-0029), addressed by the hash of its inputs.
+    # If a PR changes the image, its firmware and ROS jobs run in that PR's
+    # image, not in the old one from main. Built only when the hash is new;
+    # main also publishes it as :latest for devcontainer.json and teammates.
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.pick.outputs.image }}
+    env:
+      IMAGE: ghcr.io/autonomous-robotics-carleton/arc-dev
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v7
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pick the image for these inputs
+        id: pick
+        run: |
+          tag="inputs-${{ hashFiles('.devcontainer/**', 'firmware/sync-mcu/west.yml') }}"
+          if docker manifest inspect "$IMAGE:$tag" > /dev/null 2>&1; then
+            echo "Reusing $IMAGE:$tag"
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event.pull_request.head.repo.fork }}" = "true" ]; then
+            # a fork's token can't push to GHCR: test in main's image instead
+            echo "::warning::Fork PR: testing in $IMAGE:latest, not this PR's image"
+            tag=latest
+            echo "exists=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "exists=false" >> "$GITHUB_OUTPUT"
+          fi
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
+          echo "image=$IMAGE:$tag" >> "$GITHUB_OUTPUT"
+
+      - name: Build the image
+        if: steps.pick.outputs.exists == 'false'
+        run: |
+          set -o pipefail
+          docker buildx build --platform linux/amd64 --load \
+            --cache-from "$IMAGE:latest" --build-arg BUILDKIT_INLINE_CACHE=1 \
+            -f .devcontainer/Dockerfile -t "${{ steps.pick.outputs.image }}" . \
+            2>&1 | tee build.log
+
+      - name: Smoke test in the image
+        if: steps.pick.outputs.exists == 'false'
+        run: |
+          set -o pipefail
+          docker run --rm -v "$PWD:/workspaces/arc-monorepo" -w /workspaces/arc-monorepo \
+            "${{ steps.pick.outputs.image }}" .devcontainer/smoke-test.sh 2>&1 | tee smoke.log
+
+      - name: Post the end of the log as an annotation
+        if: failure()
+        run: |
+          for log in build.log smoke.log; do
+            [ -s "$log" ] || continue
+            echo "::error title=$log (last 40 lines)::$(tail -n 40 "$log" | sed -e 's/%/%25/g' -e 's/\r//g' | sed ':a;N;$!ba;s/\n/%0A/g')"
+          done
+
+      - name: Push the image
+        if: steps.pick.outputs.exists == 'false'
+        run: docker push "${{ steps.pick.outputs.image }}"
+
+      - name: Publish as latest
+        if: github.ref == 'refs/heads/main'
+        run: docker buildx imagetools create -t "$IMAGE:latest" "${{ steps.pick.outputs.image }}"
+
+  dev-container:
+    # Projects that need the firmware or ROS toolchains (tag env:dev-container)
+    # build and test inside the dev container image picked by dev-image.
+    needs: dev-image
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read # nx-set-shas
+      contents: read
+      packages: read
+    container:
+      image: ${{ needs.dev-image.outputs.image }}
+      credentials:
+        username: ${{ github.actor }}
+        password: ${{ secrets.GITHUB_TOKEN }}
+      options: --user root # the runner's workspace isn't writable by the image's user
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Install deps
+        run: |
+          git config --global --add safe.directory "$GITHUB_WORKSPACE"
+          pnpm install --frozen-lockfile
+
+      - name: Set Nx base and head
+        uses: nrwl/nx-set-shas@v5
+
+      - name: Check, build and test affected firmware and ROS
+        # `nx affected` has no --projects: exclude everything without the tag
+        run: npx nx affected -t check build test --exclude='*,!tag:env:dev-container'

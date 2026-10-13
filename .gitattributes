@@ -1,0 +1,9 @@
+# Large binaries from CAD and board design go through git LFS (`git lfs install` once).
+hardware/**/*.step filter=lfs diff=lfs merge=lfs -text
+hardware/**/*.stp  filter=lfs diff=lfs merge=lfs -text
+hardware/**/*.pdf  filter=lfs diff=lfs merge=lfs -text
+hardware/**/*.zip  filter=lfs diff=lfs merge=lfs -text
+
+# Generated from systems/icd/ by tools/gen-interfaces.sh: collapsed in diffs
+firmware/sync-mcu/app/generated/** linguist-generated=true
+ros/src/arc_backend_car/include/arc_mavlink/** linguist-generated=true

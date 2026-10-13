@@ -1,61 +1,75 @@
 # ICD-corner-connector
 
-- **Revision:** D (2026-10-02). Daisy-chains the CAN-FD telemetry bus with an FD pair in and out (ADR-0013). Rev C (8-pin, single FD pair), rev B (6-pin) and rev A (`architecture.md`) are superseded.
-- **Status:** Proposed. Needs sign-off from both owners.
-- **Side A:** corner VESC board (owner TBD)
-- **Side B:** chassis harness, sync board, power board e-stop circuit (owner TBD)
-- **Traces to:** SYS-05, SYS-13, SYS-25, ADR-0004, ADR-0006, ADR-0009, ADR-0011, ADR-0012, ADR-0013, RSK-03, RSK-05
+- **Revision:** E (2026-10-07). The motor controllers move to the deck (ADR-0034), so a corner sends only its motor phases and Hall sensor cable to the chassis; the controller's own connections are on the deck. Rev D (10-pin JST-GH with daisy-chained CAN-FD, ADR-0013), rev C, rev B and rev A are superseded.
+- **Status:** Draft. Needs Molex pin numbering against Triforce's pinout layout, and sign-off from both owners.
+- **Side A:** corner assembly: motor (E-51), gearbox (owner TBD)
+- **Side B:** chassis harness, the motor controllers on the deck (E-50), sync board, power board e-stop circuit (owner TBD)
+- **Traces to:** SYS-05, SYS-13, SYS-19, SYS-25, ADR-0008, ADR-0009, ADR-0012, ADR-0034, RSK-11
 
-Each corner has two connectors to the chassis: power, and signal. The wheel encoder and suspension angle sensor do **not** pass through this interface; they wire directly to the sync board (ADR-0008).
+The wheel encoder and suspension angle sensor don't pass through this interface; they wire directly to the sync board (ADR-0008).
 
-## Power connector
+## At the corner boundary
+
+Two connections per corner, both crossing the suspension.
 
 | Item | Value |
 | --- | --- |
-| Connector | XT60 (TBC against final per-corner peak current) |
-| Voltage | 4S LiPo bus: 12.0–16.8 V; transients up to the bus clamp threshold (TBD) |
-| Current | Peak `TBD` A, continuous `TBD` A per corner (from `budgets/power.csv`) |
-| Polarity | Keyed by the XT60 housing |
+| Motor phases | 3 leads, motor to its controller on the deck. Connector at the corner boundary `TBD` (the A50S end is an MR30) |
+| Phase current | Per corner at 1 g: `budgets/power-scenarios.md` (TBC); bursts set by the controller's current limit |
+| Hall sensor cable | The Castle 1010's 6-pin sensor cable (210 mm supplied), extended to the deck. Halls A, B, C, 5 V and GND; whether it carries a motor thermistor is undocumented (the 1010 isn't ROAR certified), so check on arrival; otherwise E-28 on the can. Routed away from the phase leads |
+| Length | Corner to deck, `TBD` from the CAD layout; as short as the layout allows |
 
-## Signal connector
+## Motor controller connections (on the deck)
 
-Connector: JST-GH 10-pin (GHR-10V-S housing on the harness side; board header TBC: vertical or right-angle).
+The A50S V2.3c (ADR-0034) has an XT30 for power, an MR30 for the motor, a micro-USB for VESC Tool, and a 20-pin Molex Pico-Clasp for everything else. The harness side is the 501189-2010 receptacle crimp housing: 1.00 mm pitch, dual row, inner positive lock, −40 to +105 °C, with Molex 501193 gold crimp terminals (Molex's extraction tool for them is rated 28–32 AWG, so plan thin signal wire). Source: Triforce's product page and its pinout image (`Pinout_V2.3`, read 2026-10-07).
 
-| Pin | Net | Direction (from VESC) | Electrical | Notes |
-| --- | --- | --- | --- | --- |
-| 1 | CAN_H | Bidirectional | Classic CAN, ISO 11898-2, 1 Mbit/s | Command bus. Twisted with pin 2. VESC built-in CAN + TJA1051T/3 |
-| 2 | CAN_L | Bidirectional | | |
-| 3 | GND | — | Signal reference | Command-bus return; separates command and FD pairs |
-| 4 | FD_IN_H | Bus | CAN FD, ISO 11898-2:2016, 1 Mbit/s arbitration / 5 Mbit/s data | Telemetry bus from the sync board side. Twisted with pin 5 |
-| 5 | FD_IN_L | Bus | | |
-| 6 | FD_OUT_H | Bus | Same net as pin 4, passed straight through on the PCB | Telemetry bus onward to the far VESC. Twisted with pin 7 |
-| 7 | FD_OUT_L | Bus | Same net as pin 5 | At the far VESC: short pigtail to the harness terminator |
-| 8 | GND | — | Signal reference | FD and ESTOP_EN return |
-| 9 | ESTOP_EN | Input | Logic high = run, low or open = e-stop. Level `TBC` (5 V, input 3.3 V-tolerant) | See below |
-| 10 | SPARE | — | Not connected on either board | Wired through the harness (one spare conductor per run) |
+| Connection | Net | Electrical | Notes |
+| --- | --- | --- | --- |
+| XT30 | Motor bus | 4S: 12.0–16.8 V; transients up to the bus clamp threshold (TBD) | From the power board's switched motor bus (ADR-0034); cut by the e-stop delay. Triforce's supplied bulk capacitor goes on this cable as close to the board as possible |
+| MR30 | Motor phases A, B, C | See above | |
+| Micro-USB | VESC Tool | | Configuration and firmware upload |
 
-**On-board FD routing (VESC fork, ADR-0013):** pins 4↔6 and 5↔7 pass straight through as a ~120 Ω differential pair; the FD transceiver (separate SO-8, SIC drop-in) taps the pair within ~1–2 cm of the connector, so the stub is a PCB trace. Unpopulated footprints on the pair: split termination behind a solder jumper, common-mode choke (0 Ω bypass), ESD/TVS.
+**Signal connector, as laid out in Triforce's pinout image** (red-marked pins are 3.3 V max). Circuit numbers, provisional: Molex's drawing for 501189-2010 numbers the mating face with the latch on top as circuit 1 top-right, circuit 2 bottom-right, odd along the latch row and even along the other, counting leftwards. Assuming Triforce's image is that face, latch on top, position 10 is circuits 1 (top) and 2 (bottom) and position 1 is circuits 19 and 20. Verify on the first unit: the four corners are all GND, so check that 5 V sits at circuit 9 and 3.3 V at circuit 10 (if they're at 11 and 12, the image is mirrored):
 
-### ESTOP_EN behaviour
+| Position | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Circuits (provisional): top / bottom | 19 / 20 | 17 / 18 | 15 / 16 | 13 / 14 | 11 / 12 | 9 / 10 | 7 / 8 | 5 / 6 | 3 / 4 | 1 / 2 |
+| Top row | GND | Hall 3 / CS | Hall 2 / MISO | Hall 1 / SCK | **Motor temp (3.3 V max)** | 5 V out | SWCLK | SWDIO | Servo / PPM | GND |
+| Bottom row | GND | **SCK / ADC1 (3.3 V max)** | **MISO / ADC2 (3.3 V max)** | TX / SCL / MOSI | RX / SDA / NSS | 3.3 V out | CAN H | CAN L | Aux power in, 12–48 V | GND |
 
-Controlled braked stop, then a hardware torque cut (SYS-05, ADR-0012).
+How the car uses it:
 
-- **Fail-safe:** the VESC board pulls ESTOP_EN low on board. An unplugged connector, a broken wire or an unpowered e-stop circuit all count as an e-stop.
-- **Stage 1, braking (firmware):** the VESC reads ESTOP_EN on a GPIO. When it's low, it ignores commands on the command bus and ramps brake current to the target deceleration until the wheel stops.
-- **Stage 2, torque cut (hardware):** a delay circuit on the VESC board ANDs the delayed ESTOP_EN into the DRV8301 EN_GATE. After T (TBC 3 s), gate drive is off whatever the firmware is doing.
-- **Release:** doesn't restart motion. The VESC re-initialises the DRV8301 and waits for fresh commands.
+| Net | Use |
+| --- | --- |
+| CAN H / CAN L | Command bus (ADR-0009), twisted pair |
+| TX / RX | Telemetry UART to the sync MCU, 2 Mbit/s (ICD-controller-telemetry), each twisted with GND (ADR-0034) |
+| Servo / PPM | **ESTOP** input. Not marked 3.3 V max, so 5 V logic is acceptable per Triforce's marking (TBC with them); the controller MCU's pin (PB6 on the A50S, not the sync MCU's) is 5 V tolerant |
+| Hall 1–3, Motor temp, 5 V, GND | From the motor's sensor cable. The 5 V output powers the motor's Hall sensors only; the controllers' 5 V outputs are never tied together (Triforce: "only use 1 BEC") |
+| SWCLK / SWDIO | **SWD on the connector:** a bad firmware build is recovered with a probe through the harness, no soldering (RSK-20) |
+| Aux power in | Optional logic supply. Feeding it from an always-on rail would keep the controllers' MCUs and telemetry alive after the e-stop cuts the motor bus: the EE's call |
+| ADC1, ADC2, 3.3 V | Unused |
+
+### ESTOP behaviour
+
+Controlled braked stop, then a hardware torque cut (SYS-05, ADR-0012 as amended by ADR-0034).
+
+- **Fail-safe:** our firmware enables the MCU's internal pull-down on the ESTOP input (TBC that the board adds no pull-up), so an unplugged connector, a broken wire or an unpowered e-stop circuit reads as e-stop.
+- **Stage 1, braking (firmware):** when ESTOP is low, the controller ignores commands on the command bus and ramps brake current to the target deceleration until the wheel stops.
+- **Stage 2, torque cut (hardware):** the power board removes motor-bus power after T, whatever the controller firmware is doing. **T = 2.4 s (TBC; set 2026-10-08):** the stop from 9 m/s at ~5 m/s² takes ~1.9 s with its ~150 ms ramp, and T adds ~25% margin, as ADR-0012 intended. Confirmed on rig R2. T must come after the stop: cutting the bus while the controllers are still braking ends the braking.
+- **The motor-bus switch opens when unpowered,** so losing the e-stop circuit's power also gives the hardware cut.
+- **A broken ESTOP wire to one controller** brakes that corner, which reports it in its telemetry (`ESTOP`, ADR-0035), and the sync MCU stops the car through SYS-25. It doesn't trigger the hardware cut: only the button does. Accepted as a trade-off (2026-10-07).
+- **Release:** doesn't restart motion. The controllers wait for fresh commands once the motor bus is back.
 
 ## Termination
 
-No termination populated on any corner board, so all four boards stay identical.
-
-- **Command bus:** 120 Ω at the sync board and at the far end of the harness trunk (ADR-0009).
-- **Each telemetry bus:** daisy-chained sync board → near VESC → far VESC. Split termination (2 × 60 Ω + capacitor) on the sync board, and in a sealed terminator on a short pigtail from the far VESC's FD_OUT pins (ADR-0013). The on-board footprint behind a solder jumper is the fallback.
+- **Command bus:** 120 Ω at the sync board and at the far end of the trunk (ADR-0009). Nothing populated on the controllers.
+- **UART links:** point to point, no termination.
 
 ## Open issues
 
-0. RSK-03 bench test (`tests/rsk-03-canfd-bench.md`) before the VESC fork layout; record the measured stub and termination limits here.
-1. ESTOP_EN logic level and driver: who sources it (power board e-stop circuit), and the current per corner.
-2. Sync-board CAN ground and power-board ground both reach battery negative through motor power, which forms a loop. Settle this in the grounding strategy before harness layout.
-3. Brake ramp, target deceleration and delay T (ADR-0012).
-4. XT60 rating against final peak current.
+1. Confirm the provisional circuit numbers above on the first unit (5 V at circuit 9, 3.3 V at circuit 10).
+2. ESTOP logic level (3.3 or 5 V; the PPM pin takes either) and driver: the power board sources it; the current per controller.
+3. Whether the Aux power input is fed from an always-on rail (telemetry and logging survive the motor-bus cut).
+4. The connector at the corner boundary for the phase leads and the Hall cable; lengths from the CAD layout.
+5. Sync-board signal ground and power-board ground both reach battery negative through the motor bus, which forms a loop. Settle it in the grounding strategy before harness layout.
+6. Brake ramp, target deceleration and delay T (ADR-0012).

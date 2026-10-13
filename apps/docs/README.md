@@ -1,45 +1,30 @@
-# 2025
+# docs
 
-This is a Next.js application generated with
-[Create Fumadocs](https://github.com/fuma-nama/fumadocs).
-
-Run development server:
+The docs site, [docs.arcarleton.ca](https://docs.arcarleton.ca): Fumadocs on Next.js.
 
 ```bash
-npm run dev
-# or
-pnpm dev
-# or
-yarn dev
+npx nx dev docs     # http://localhost:3000
+npx nx build docs
 ```
 
-Open http://localhost:3000 with your browser to see the result.
+Don't run `nx build docs` while `nx dev docs` is running: both write `.next`.
 
-## Explore
+## Where pages come from
 
-In the project, you can see:
+Declared in `source.config.ts` and combined in `lib/source.ts`; edit the source, not a copy:
 
-- `lib/source.ts`: Code for content source adapter, [`loader()`](https://fumadocs.dev/docs/headless/source-api) provides the interface to access your content.
-- `lib/layout.shared.tsx`: Shared options for layouts, optional but preferred to keep.
+| Source | On the site | Format |
+| --- | --- | --- |
+| `content/docs/` | The index, the handbook and the car's Topology page (`car/topology.mdx`, which embeds `systems/topology.html` from `/embed/topology`) | MDX |
+| `../../systems/` | `/docs/car` (its README is `/docs/how-these-docs-work`; the ADR template is left out) | Markdown |
+| `../web/docs/` | `/docs/handbook/website` | MDX |
+| `../../platform/dev-kit/` | `/docs/handbook/orin-dev-kit` | MDX |
+| `../../.github/CONTRIBUTING.md` | `/docs/handbook/contributing` | Markdown |
 
-| Route                     | Description                                            |
-| ------------------------- | ------------------------------------------------------ |
-| `app/(home)`              | The route group for your landing page and other pages. |
-| `app/docs`                | The documentation layout and pages.                    |
-| `app/api/search/route.ts` | The Route Handler for search.                          |
+The car section's sidebar order and folder titles are set in code (`carSidebar` in `lib/source.ts`), not in `meta.json`: a new folder under `systems/` needs an entry there. The budget CSVs get generated pages (`app/docs/car/budgets/data/`).
 
-### Fumadocs MDX
+Links between pages are relative file paths, so they also work on GitHub; IDs like SYS-04 are linked automatically (`lib/remark-system-ids.ts`). For LLMs: `/llms.txt`, `/llms-full.txt`, `/ids.json`, and every page as Markdown at its URL + `.md`. More in `AGENTS.md` (Docs site).
 
-A `source.config.ts` config file has been included, you can customise different options like frontmatter schema.
+## Deployment
 
-Read the [Introduction](https://fumadocs.dev/docs/mdx) for further details.
-
-## Learn More
-
-To learn more about Next.js and Fumadocs, take a look at the following
-resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js
-  features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-- [Fumadocs](https://fumadocs.vercel.app) - learn about Fumadocs
+`apps/docs/Dockerfile` builds the image; CI publishes it from `main` and triggers the server's update hook.

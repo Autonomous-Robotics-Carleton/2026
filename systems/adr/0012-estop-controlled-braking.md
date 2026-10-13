@@ -1,10 +1,9 @@
 # ADR-0012: E-stop is a controlled braked stop, then a hardware torque cut
 
-- **Status:** Accepted (2026-10-03). Values TBC on the R2 motor bench: ~5 m/s² deceleration, ~150 ms brake ramp, ~3 s hardware cut
+- **Status:** Accepted (2026-10-03), amended by ADR-0019 (steering returns to centre under sync-MCU command, holds position if the sync MCU is silent, and its power is cut after the drive corners) and ADR-0034 (stage 2, the hardware torque cut, is the power board removing motor-bus power after T, not a timer on each controller; T TBC 2.4 s, after the ~1.9 s stop from 9 m/s; ICD-corner-connector). Values TBC on the R2 motor bench: ~5 m/s² deceleration, ~150 ms brake ramp
 - **Date:** 2026-10-02
 - **Deciders:** Shrikar Vempati
 - **Traces to:** SYS-04, SYS-05, ICD-corner-connector, RSK-11
-- **Amended by:** ADR-0019 (steering returns to centre under sync-MCU command, holds position if the sync MCU is silent, and its power is cut after the drive corners)
 
 ## Context
 
