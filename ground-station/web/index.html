@@ -3,146 +3,249 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ARC Ground Station</title>
+<title>arc ground station</title>
 <style>
+  /* Tokens from the ARC Ground Station design system. Dark is primary; light for daylight use. */
   :root {
-    --bg: #f4f4f2; --grid: #dcdcd8; --axis: #b4b4ae; --text: #222; --muted: #6b6b66;
-    --wall: #2b2b2e; --car: #d2452d; --ghost: #2d6fd2; --trail: rgba(210, 69, 45, 0.35); --panel: rgba(255, 255, 255, 0.92);
-    --real: #ffffff; --real-edge: #1a1a1a; --trail-real: rgba(60, 60, 60, 0.35);
-    --ok: #2f8a3e; --warn: #b7791f; --bad: #c0392b; --btn: #e6e6e2; --line: #d0d0cb;
+    --bg: #1a1a1c; --grid: #242428; --grid-axis: #303036; --panel: #131315; --panel-raised: #232327; --line: #34343a;
+    --ink: #e8e8e6; --ink-muted: #8e8e94; --ink-faint: #5f5f66; --accent: #2d6fd2; --on-accent: #ffffff;
+    --car: #d2452d; --odom: #2d6fd2; --real: #ffffff; --real-edge: #000000;
+    --ok: #4cc764; --ok-bg: #12301b; --warn: #e3a53c; --warn-bg: #3a2a0c; --warn-fill: #e3a53c; --on-warn: #1a1305;
+    --bad: #f0564a; --bad-bg: #3d1512;
+    --series-1: #5aa9e6; --series-2: #e8975a; --series-3: #b48ae6; --series-4: #d9cf5a;
+    --shadow-panel: 0 4px 16px rgba(0,0,0,0.45);
+    --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+    --space-1: 2px; --space-2: 4px; --space-3: 6px; --space-4: 8px; --space-5: 12px; --space-6: 16px;
+    --radius-sm: 2px; --radius-md: 4px; --topbar-h: 36px; --panel-min-w: 200px;
   }
-  @media (prefers-color-scheme: dark) {
+  @media (prefers-color-scheme: light) {
     :root {
-      --bg: #17181a; --grid: #26282b; --axis: #3a3d42; --text: #e8e8e6; --muted: #9a9a95;
-      --wall: #b9bbc0; --car: #ff6a4d; --ghost: #5b9bff; --trail: rgba(255, 106, 77, 0.35); --panel: rgba(30, 31, 34, 0.92);
-      --real: #ffffff; --real-edge: #000000; --trail-real: rgba(255, 255, 255, 0.35);
-      --ok: #5cc26d; --warn: #e0a84a; --bad: #ff6a5c; --btn: #2c2e32; --line: #3a3d42;
+      --bg: #e4e4e1; --grid: #d6d6d2; --grid-axis: #c4c4bf; --panel: #f7f7f5; --panel-raised: #ebebe8; --line: #c9c9c4;
+      --ink: #18181a; --ink-muted: #5c5c62; --ink-faint: #8f8f95; --real-edge: #1a1a1a;
+      --ok: #1d7a34; --ok-bg: #dcefe0; --warn: #8a5a00; --warn-bg: #f6e7c6; --bad: #b42318; --bad-bg: #f8dcd8;
+      --series-1: #1f6fb8; --series-2: #a8520f; --series-3: #7a4fc0; --series-4: #7a6c00;
+      --shadow-panel: 0 2px 10px rgba(0,0,0,0.12);
     }
   }
-  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--text);
-    font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; overflow: hidden; }
-  canvas { display: block; width: 100vw; height: 100vh; cursor: grab; touch-action: none; }
-  canvas.dragging { cursor: grabbing; }
-  #panel { position: fixed; top: 12px; left: 12px; background: var(--panel); padding: 8px 12px;
-    border-radius: 6px; width: 260px; max-width: calc(100vw - 48px); max-height: calc(100vh - 40px); overflow: auto; }
-  #panel b { font-weight: 600; }
-  .row { display: flex; justify-content: space-between; gap: 12px; }
-  .row > span:last-child { text-align: right; }
-  .muted { color: var(--muted); }
-  .ok { color: var(--ok); } .warn { color: var(--warn); } .bad { color: var(--bad); }
-  .sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
-  label { display: block; margin-top: 6px; cursor: pointer; user-select: none; }
-  details { border-top: 1px solid var(--line); padding: 4px 0; }
-  summary { cursor: pointer; font-weight: 600; user-select: none; padding: 2px 0; }
-  button { font: inherit; color: var(--text); background: var(--btn); border: 1px solid var(--line);
-    border-radius: 4px; padding: 3px 8px; cursor: pointer; }
-  button.on { background: var(--ghost); border-color: var(--ghost); color: #fff; }
-  button.danger { background: var(--bad); border-color: var(--bad); color: #fff; }
-  input[type=text], input[type=number], select { font: inherit; color: var(--text); background: var(--bg);
-    border: 1px solid var(--line); border-radius: 4px; padding: 2px 4px; width: 7em; }
-  .seg { display: flex; gap: 4px; }
-  .field { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; }
-  #cutoff { width: 100%; margin-top: 6px; }
-  #log { margin-top: 4px; max-height: 8.5em; overflow: auto; font-size: 11px; white-space: pre; color: var(--muted); }
-  .sub { margin-top: 6px; font-size: 11px; color: var(--muted); }
-  #driving { padding: 0 4px; border-radius: 3px; }
-  #driving.active { background: var(--ok); color: #fff; }
-  /* Real mode with no car: a centred card over the canvas, never auto-dismissed. */
-  #nocar { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: var(--panel);
-    border: 2px solid var(--bad); border-radius: 8px; padding: 16px 20px; text-align: center;
-    width: 300px; max-width: calc(100vw - 64px); display: none; }
-  #nocar h2 { margin: 0 0 6px; font-size: 18px; color: var(--bad); }
-  #nocar .field { justify-content: center; }
-  #toast { position: fixed; right: 12px; bottom: 12px; background: var(--panel); border: 1px solid var(--ok);
-    border-radius: 6px; padding: 8px 10px; display: none; align-items: center; gap: 10px; max-width: calc(100vw - 48px); }
-  #banner { position: fixed; top: 12px; left: 50%; transform: translateX(-50%); background: var(--warn); color: #000;
-    border-radius: 6px; padding: 6px 12px; display: none; max-width: calc(100vw - 48px); text-align: center; }
+  *, *::before, *::after { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; background: var(--bg); color: var(--ink); overflow: hidden;
+    font: 12px/16px var(--font-mono); -webkit-font-smoothing: antialiased; }
+  button, input, select { font: inherit; color: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+  /* ---------- viewport ---------- */
+  #c { position: fixed; left: 0; right: 0; top: var(--topbar-h); bottom: 0; width: 100vw; height: calc(100vh - var(--topbar-h));
+    display: block; cursor: grab; touch-action: none; }
+  #c.dragging { cursor: grabbing; }
+  .hint { position: fixed; left: var(--space-5); bottom: var(--space-4); font-size: 11px; color: var(--ink-muted); pointer-events: none; }
+
+  /* ---------- top bar ---------- */
+  .topbar { position: fixed; top: 0; left: 0; right: 0; z-index: 100000; display: flex; align-items: center; gap: var(--space-4);
+    height: var(--topbar-h); padding: 0 var(--space-5); background: var(--panel); border-bottom: 1px solid var(--line); }
+  .topbar__title { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; margin-right: var(--space-4); }
+  .topbar__spacer { flex: 1; }
+  .menu-wrap { position: relative; }
+  .menu-wrap .menu { position: absolute; right: 0; top: 30px; display: none; }
+  .menu-wrap.open .menu { display: block; }
+
+  /* ---------- pills ---------- */
+  .pill { display: inline-flex; align-items: center; gap: 6px; padding: var(--space-1) var(--space-4); height: 22px; flex: none;
+    border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--panel-raised); font-size: 11px; white-space: nowrap; }
+  .pill__k { color: var(--ink-muted); }
+  .pill__dot { width: 6px; height: 6px; background: var(--ink-faint); flex: none; }
+  .pill--ok .pill__dot { background: var(--ok); } .pill--ok .pill__v { color: var(--ok); }
+  .pill--warn { background: var(--warn-bg); border-color: var(--warn); }
+  .pill--warn .pill__dot { background: var(--warn); } .pill--warn .pill__v { color: var(--warn); }
+  .pill--bad { background: var(--bad-bg); border-color: var(--bad); }
+  .pill--bad .pill__dot { background: var(--bad); animation: blink 1s steps(2, start) infinite; }
+  .pill--bad .pill__v { color: var(--bad); font-weight: 700; }
+  @keyframes blink { to { visibility: hidden; } }
+  @media (prefers-reduced-motion: reduce) { .pill--bad .pill__dot { animation: none; } }
+
+  /* ---------- buttons and controls ---------- */
+  .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 3px 10px; min-height: 24px;
+    background: var(--panel-raised); border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; white-space: nowrap; }
+  .btn:hover { border-color: var(--ink-muted); }
+  .btn--block { display: flex; width: 100%; }
+  .btn--ghost { background: transparent; border-color: transparent; }
+  .btn--ghost:hover { border-color: var(--line); }
+  .btn--danger { color: var(--bad); border-color: var(--bad); background: var(--bad-bg); }
+  .btn--danger:hover { background: var(--bad); color: var(--panel); }
+  .btn--small { min-height: 18px; padding: 0 6px; font-size: 11px; }
+  .iconbtn { width: 18px; height: 18px; display: inline-grid; place-items: center; padding: 0; background: none; flex: none;
+    border: 1px solid transparent; border-radius: var(--radius-sm); color: var(--ink-muted); cursor: pointer; font-size: 11px; line-height: 1; }
+  .iconbtn:hover { color: var(--ink); border-color: var(--line); }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: var(--radius-sm); overflow: hidden; }
+  .seg button { background: var(--panel-raised); border: 0; padding: 2px 10px; cursor: pointer; }
+  .seg button + button { border-left: 1px solid var(--line); }
+  .seg button[aria-pressed="true"] { background: var(--accent); color: var(--on-accent); }
+  .input, .select { height: 22px; padding: 0 6px; background: var(--panel-raised); border: 1px solid var(--line); border-radius: var(--radius-sm); width: 96px; }
+  .check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+  .check input, .range { accent-color: var(--accent); margin: 0; }
+  .range { width: 96px; }
+
+  /* ---------- panel ---------- */
+  .panel { position: absolute; display: flex; flex-direction: column; min-width: var(--panel-min-w);
+    background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--shadow-panel); }
+  .panel__head { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-3) var(--space-3) var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--line); cursor: grab; user-select: none; touch-action: none; }
+  .panel__head:active { cursor: grabbing; }
+  .panel__title { font-weight: 700; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .panel__meta { color: var(--ink-muted); font-size: 11px; white-space: nowrap; }
+  .panel__body { padding: var(--space-4) 10px 10px; overflow: auto; flex: 1; min-height: 0; display: flex; flex-direction: column; gap: var(--space-5); }
+  .panel.is-collapsed .panel__body, .panel.is-collapsed .panel__grip { display: none; }
+  .panel.is-collapsed .panel__head { border-bottom: 0; }
+  .panel.is-dragging { opacity: .92; outline: 1px dashed var(--accent); }
+  .panel.is-flash { outline: 2px solid var(--accent); }
+  .panel__grip { position: absolute; right: 1px; bottom: 1px; width: 12px; height: 12px; cursor: nwse-resize; touch-action: none;
+    background: linear-gradient(135deg, transparent 0 55%, var(--ink-faint) 55% 62%, transparent 62% 72%, var(--ink-faint) 72% 79%, transparent 79%); }
+
+  /* ---------- readouts ---------- */
+  .sub { font-size: 11px; line-height: 14px; color: var(--ink-muted); margin-bottom: var(--space-2); }
+  .kv { display: grid; grid-template-columns: 1fr auto; align-items: center; row-gap: var(--space-1); column-gap: var(--space-5); margin: 0; }
+  .kv dt, .kv dd { margin: 0; }
+  .kv dd { text-align: right; font-variant-numeric: tabular-nums; }
+  .unit { color: var(--ink-muted); }
+  .is-ok { color: var(--ok); } .is-warn { color: var(--warn); } .is-bad { color: var(--bad); } .is-muted { color: var(--ink-muted); } .is-faint { color: var(--ink-faint); }
+  .swatch { display: inline-block; width: 8px; height: 8px; margin-right: 6px; }
+  .split { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-6); }
+  .split > * + * { border-left: 1px solid var(--line); padding-left: var(--space-6); }
+  .stack { display: flex; flex-direction: column; gap: var(--space-4); }
+
+  /* ---------- status chain ---------- */
+  .chain { display: flex; flex-wrap: wrap; align-items: stretch; gap: var(--space-2); }
+  .chain__arrow { align-self: center; color: var(--ink-faint); font-size: 11px; }
+  .tile { flex: 1; min-width: 64px; padding: var(--space-3) 6px; background: var(--panel-raised); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+  .tile__k { font-size: 10px; line-height: 12px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: .06em; }
+  .tile__v { color: var(--ok); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile__d { font-size: 10px; line-height: 12px; color: var(--ink-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tile.is-warn .tile__v { color: var(--warn); }
+  .tile.is-broken { background: var(--bad-bg); border-color: var(--bad); }
+  .tile.is-broken .tile__v { color: var(--bad); font-weight: 700; }
+  .tile.is-stale { background: transparent; border-style: dashed; }
+  .tile.is-stale .tile__k, .tile.is-stale .tile__v, .tile.is-stale .tile__d { color: var(--ink-faint); }
+
+  /* ---------- timeout bar ---------- */
+  .tbar { display: grid; grid-template-columns: 1fr auto; row-gap: var(--space-1); align-items: center; }
+  .tbar__val { text-align: right; font-variant-numeric: tabular-nums; }
+  .tbar__track { grid-column: 1 / -1; position: relative; height: 8px; background: var(--panel-raised); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+  .tbar__fill { position: absolute; left: 0; top: 0; bottom: 0; width: 0; background: var(--ok); }
+  .tbar.is-warn .tbar__fill { background: var(--warn); } .tbar.is-warn .tbar__val { color: var(--warn); }
+  .tbar.is-bad .tbar__fill { background: var(--bad); } .tbar.is-bad .tbar__val { color: var(--bad); }
+  .tbar.is-none .tbar__val { color: var(--ink-faint); }
+  .tbar__tick { position: absolute; top: -4px; bottom: -4px; left: 50%; width: 2px; background: var(--bad); }
+
+  /* ---------- state strip ---------- */
+  .strip { padding: var(--space-4) 10px; border: 1px solid; border-radius: var(--radius-sm); font-size: 14px; line-height: 18px; font-weight: 700; letter-spacing: .04em; }
+  .strip small { font-size: 12px; font-weight: 400; letter-spacing: 0; }
+  .strip--armed { color: var(--ok); background: var(--ok-bg); border-color: var(--ok); }
+  .strip--stopping { color: var(--bad); background: var(--bad-bg); border-color: var(--bad); }
+
+  /* ---------- log ---------- */
+  .log summary { cursor: pointer; color: var(--ink-muted); font-size: 11px; list-style: none; }
+  .log summary::-webkit-details-marker { display: none; }
+  .log summary::before { content: "▸ "; }
+  .log[open] summary::before { content: "▾ "; }
+  .log ol { list-style: none; margin: var(--space-2) 0 0; padding: 0; font-size: 11px; line-height: 14px; color: var(--ink-muted); max-height: 84px; overflow: auto; }
+  .log time { color: var(--ink-faint); margin-right: 6px; }
+
+  /* ---------- topics and plots ---------- */
+  .topics { width: 100%; border-collapse: collapse; }
+  .topics td { padding: 3px 0; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  .topics tr:last-child td { border-bottom: 0; }
+  .topics .t { max-width: 1px; overflow: hidden; text-overflow: ellipsis; width: 100%; padding-right: var(--space-4); }
+  .topics .ty { color: var(--ink-muted); font-size: 11px; padding-right: var(--space-4); }
+  .topics .hz { text-align: right; font-variant-numeric: tabular-nums; padding-right: var(--space-4); }
+  .topics .hz.is-stale { color: var(--ink-faint); }
+  .plot { display: flex; flex-direction: column; gap: var(--space-2); }
+  .plot__head { display: flex; gap: var(--space-4); align-items: baseline; }
+  .plot__topic { font-weight: 700; }
+  .plot__meta { color: var(--ink-muted); font-size: 11px; margin-left: auto; font-variant-numeric: tabular-nums; }
+  .plot canvas { display: block; width: 100%; height: 110px; background: var(--panel-raised); border: 1px solid var(--line); border-radius: var(--radius-sm); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-5); font-size: 11px; color: var(--ink-muted); }
+  .legend i { display: inline-block; width: 10px; height: 2px; vertical-align: 3px; margin-right: 4px; }
+  .legend i.dashed { background: none !important; border-top: 2px dashed; height: 0; }
+  .empty { color: var(--ink-muted); }
+
+  /* ---------- menu ---------- */
+  .menu { min-width: 240px; padding: var(--space-2) 0; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-md); box-shadow: var(--shadow-panel); }
+  .menu__group { padding: var(--space-3) 10px var(--space-1); font-size: 10px; line-height: 12px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: .06em; }
+  .menu__item { display: flex; align-items: center; gap: var(--space-4); width: 100%; padding: 3px 10px; background: none; border: 0; text-align: left; cursor: pointer; }
+  .menu__item:hover { background: var(--panel-raised); }
+  .menu__check { width: 10px; color: var(--accent); font-weight: 700; }
+  .menu__note { margin-left: auto; color: var(--ink-muted); font-size: 11px; }
+  .menu__item[aria-disabled="true"] { color: var(--ink-faint); cursor: not-allowed; }
+  .menu__item[aria-disabled="true"]:hover { background: none; }
+
+  /* ---------- banner, no-car card, toast ---------- */
+  .banner { position: fixed; top: calc(var(--topbar-h) + var(--space-5)); left: 50%; transform: translateX(-50%); z-index: 99999;
+    padding: var(--space-2) 10px; background: var(--warn-fill); color: var(--on-warn); border-radius: var(--radius-md);
+    font-weight: 500; max-width: calc(100vw - 48px); text-align: center; display: none; }
+  .card { position: fixed; z-index: 99998; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius-md);
+    box-shadow: var(--shadow-panel); padding: var(--space-5); display: none; flex-direction: column; gap: var(--space-4); }
+  #nocar { top: 50%; left: 50%; transform: translate(-50%, -50%); width: 320px; max-width: calc(100vw - 64px); border-color: var(--bad); }
+  #nocar h2 { margin: 0; font-size: 14px; line-height: 18px; color: var(--bad); letter-spacing: .04em; }
+  #toast { right: var(--space-5); bottom: var(--space-5); flex-direction: row; align-items: center; max-width: calc(100vw - 48px); }
 </style>
 </head>
 <body>
 <canvas id="c"></canvas>
+<div class="hint">drag to pan · scroll to zoom · grid 1 m</div>
 
-<div id="panel">
-  <div class="row"><b>ARC ground station</b><span id="driving" class="muted">idle</span></div>
-
-  <details open>
-    <summary>Status</summary>
-    <div class="row"><span>server</span><span id="serverWs" class="muted">connecting</span></div>
-    <div class="row"><span>helper</span><span id="helperWs" class="muted">connecting</span></div>
-    <div class="row"><span>mode</span><span id="mode">-</span></div>
-    <div class="row"><span>link</span><span id="conn">-</span></div>
-    <div class="row" id="simRow"><span>sim</span><span id="simState">-</span></div>
-    <div class="row"><span>track</span><span id="track">none</span></div>
-  </details>
-
-  <details open>
-    <summary>Car</summary>
-    <div class="row"><span>source</span><span id="source">-</span></div>
-    <div class="row"><span><span class="sw" id="carSw" style="background:var(--car)"></span><span id="poseLabel">pose</span></span><span id="pose">-</span></div>
-    <div id="simOnly">
-      <div class="row"><span><span class="sw" style="background:var(--ghost)"></span>odom</span><span id="odom">-</span></div>
-      <div class="row"><span>odom error</span><span id="err">-</span></div>
-      <label><input type="checkbox" id="ghost" checked> show ghost (odom estimate)</label>
-    </div>
-  </details>
-
-  <details open>
-    <summary>Heartbeat</summary>
-    <div class="sub">sent by this ground station</div>
-    <div class="row"><span>sending</span><span id="hbSending">-</span></div>
-    <div class="row"><span>reason</span><span id="hbReason">-</span></div>
-    <div class="row"><span>heartbeats/s</span><span id="hbRate">-</span></div>
-    <div class="row"><span>last seq</span><span id="hbSeq">-</span></div>
-    <button id="cutoff">Test heartbeat cutoff</button>
-    <div class="sub">reported by the <span id="reporter">car</span></div>
-    <div class="row"><span>heartbeat age</span><span id="lkHb">-</span></div>
-    <div class="row"><span>teleop age</span><span id="lkTe">-</span></div>
-    <div class="row"><span>stopping</span><span id="lkStop">-</span></div>
-    <div class="row"><span>reason</span><span id="lkReason">-</span></div>
-    <div class="sub">log</div>
-    <div id="log"></div>
-  </details>
-
-  <details id="settings">
-    <summary>Settings</summary>
-    <div class="field"><span>source</span>
-      <span class="seg"><button id="setSim">sim</button><button id="setReal">real</button></span></div>
-    <div class="field"><span>sim track</span><select id="trackIn"><option>oval</option></select></div>
-    <div class="field"><span>camera</span><span id="camMode" class="muted">following car</span></div>
-    <button id="recenter" style="width:100%;margin-top:6px">Center camera back on car</button>
-    <div class="field"><span>max speed m/s</span><input type="number" id="maxSpeed" value="1.0" min="0" max="10" step="0.1"></div>
-    <div class="sub">drive: W/S or up/down, steer A/D or left/right; gamepad left stick + triggers</div>
-  </details>
-  <div class="muted" style="margin-top:6px">scroll to zoom · grid 1 m</div>
+<div class="topbar">
+  <span class="topbar__title">arc ground station</span>
+  <span class="pill" id="pillTarget"><span class="pill__dot"></span><span class="pill__k">target</span><span class="pill__v">—</span></span>
+  <span class="pill" id="pillDrive"><span class="pill__dot"></span><span class="pill__v">idle</span></span>
+  <span class="pill" id="pillHb"><span class="pill__dot"></span><span class="pill__k">heartbeat</span><span class="pill__v">—</span></span>
+  <span class="topbar__spacer"></span>
+  <button class="btn btn--ghost" id="resetLayout">Reset layout</button>
+  <span class="menu-wrap" id="menuWrap">
+    <button class="btn" id="addBtn" aria-haspopup="menu" aria-expanded="false">+ Add panel ▾</button>
+    <div class="menu" id="menu" role="menu"></div>
+  </span>
 </div>
 
-<div id="nocar">
-  <h2>No car found</h2>
-  <div class="muted">Real mode: waiting for the car to answer. This page keeps trying; it will not switch on its own.</div>
-  <div class="field"><span>sim track</span><select id="trackIn2"><option>oval</option></select></div>
-  <div style="margin-top:10px"><button id="toSim">Switch to sim</button></div>
+<div id="panels"></div>
+
+<div class="card" id="nocar">
+  <h2>NO CAR FOUND</h2>
+  <div class="is-muted">Real mode is waiting for the car to answer. This page keeps trying and will not switch on its own.</div>
+  <dl class="kv"><dt>sim track</dt><dd><select class="select" id="trackIn2"><option>oval</option></select></dd></dl>
+  <button class="btn btn--block" id="toSim">Switch to sim</button>
 </div>
 
-<div id="toast"><span>Live car found — switch to real in Settings</span><button id="toastOpen">Settings</button><button id="toastX" title="dismiss">x</button></div>
-<div id="banner"></div>
+<div class="card" id="toast">
+  <span>Live car found; switch to real in Settings.</span>
+  <button class="btn" id="toastOpen">Settings</button>
+  <button class="iconbtn" id="toastX" aria-label="Dismiss">✕</button>
+</div>
+<div class="banner" id="banner"></div>
 
 <script>
 // Car outline in base_link (rear axle, x forward), metres. Placeholder racecar.xacro size.
 const CAR = { back: -0.06, front: 0.40, half: 0.12 };
-const TRAIL_SECONDS = 30;
 const MAX_STEER = 0.4189;       // rad, car_link clamps to this too
 const DEADZONE = 0.1;
 const HB_MS = 50;               // page -> helper heartbeat; helper stops after 0.15 s without one
 const TELEOP_MS = 20;           // 50 Hz
 const TELEOP_TAIL_MS = 200;     // keep sending zeros this long after release so the stop is explicit
+const TIMEOUT_S = 0.15;         // car_link heartbeat / teleop timeout (SYS-04)
 const LOG_LINES = 50;
+const SNAP = 8, INSET = 12, TOPBAR = 36;
+const LAYOUT_KEY = 'arc-gs-layout-v1';
 
 const $ = (id) => document.getElementById(id);
 const canvas = $('c');
 const ctx = canvas.getContext('2d');
 const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const clock = () => new Date().toTimeString().slice(0, 8);
-const setText = (id, text, cls) => { const el = $(id); el.textContent = text; el.className = cls || ''; };
+const nowS = () => performance.now() / 1000;
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+const setText = (el, text, cls) => { if (!el) return; el.textContent = text; if (cls !== undefined) el.className = cls; };
+const store = {
+  get(k) { try { return JSON.parse(localStorage.getItem(k)); } catch { return null; } },
+  set(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private window: layout just isn't kept */ } },
+};
 
 let scale = 120; // px per metre
 let state = null; // latest bridge `state` message
@@ -150,10 +253,51 @@ let link = null;  // latest server `link` message
 let trail = [];
 let trailKey = null; // which pose the trail follows; reset when it changes so we don't draw a jump
 let track = null; // {resolution, origin: [x, y, yaw], width, height, name, img}
+let tracks = { names: ['oval'], selected: 'oval' };
+let serverUp = false, helperUp = false;
+let sent = null; // latest helper `sent` report
+const logLines = [];
+const opts = { maxSpeed: 1.0, ghost: true, trail: 30, plotWindow: 20 };
+
+// ---------- data streams ----------
+// Every numeric field the page receives, grouped by the topic it comes from. Today that is what the bridge
+// forwards in `state`; a bridge that forwards more topics only needs to call ingest() for them.
+const TOPICS = {
+  sim: { estimate: ['/sim/odom', 'pose'], truth: ['/sim/ground_truth', 'pose'], link: ['/sim/link/status', 'status'] },
+  car: { estimate: ['odometry', 'pose'], link: ['link status', 'status'] },
+};
+const streams = new Map(); // name -> {type, fields: [], samples: [{t, v: {}}], arrivals: []}
+const MAX_WINDOW = 60;
+
+function flatten(obj, prefix, out) {
+  for (const [k, v] of Object.entries(obj)) {
+    const key = prefix ? `${prefix}.${k}` : k;
+    if (typeof v === 'number' && Number.isFinite(v)) out[key] = v;
+    else if (v && typeof v === 'object' && !Array.isArray(v)) flatten(v, key, out);
+  }
+  return out;
+}
+function ingest(name, type, obj) {
+  if (!obj) return;
+  let s = streams.get(name);
+  if (!s) { s = { type, fields: [], samples: [], arrivals: [] }; streams.set(name, s); }
+  const t = nowS(), v = flatten(obj, '', {});
+  for (const f of Object.keys(v)) if (!s.fields.includes(f)) s.fields.push(f);
+  s.samples.push({ t, v });
+  s.arrivals.push(t);
+  while (s.samples.length && s.samples[0].t < t - MAX_WINDOW - 1) s.samples.shift();
+  while (s.arrivals.length && s.arrivals[0] < t - 1) s.arrivals.shift();
+}
+const streamHz = (s) => {
+  const t = nowS();
+  while (s.arrivals.length && s.arrivals[0] < t - 1) s.arrivals.shift();
+  return s.arrivals.length;
+};
+const streamStale = (s) => !s.samples.length || nowS() - s.samples[s.samples.length - 1].t > 2;
 
 // ---------- track ----------
-// The server sends the walls as an alpha mask; tint it with --wall (redone if the theme flips).
-let trackMask = null, trackMeta = null, trackLoads = 0;
+// The server sends the walls as an alpha mask; tint it (redone if the theme flips).
+let trackMask = null, trackMeta = null, trackLoads = 0, trackNote = 'none';
 function tintTrack() {
   if (!trackMask || !trackMeta) return;
   const c = document.createElement('canvas');
@@ -161,52 +305,50 @@ function tintTrack() {
   const g = c.getContext('2d');
   g.drawImage(trackMask, 0, 0);
   g.globalCompositeOperation = 'source-in';
-  g.fillStyle = css('--wall'); g.fillRect(0, 0, c.width, c.height);
+  g.fillStyle = css('--ink-muted'); g.fillRect(0, 0, c.width, c.height);
   track = { ...trackMeta, img: c };
 }
-matchMedia('(prefers-color-scheme: dark)').addEventListener('change', tintTrack);
+matchMedia('(prefers-color-scheme: light)').addEventListener('change', tintTrack);
 
 async function loadTrack(meta, png) {
   const n = ++trackLoads; // a newer `track` message wins over a slow older decode
-  if (!meta) { track = trackMeta = trackMask = null; $('track').textContent = 'none'; return; }
-  if (!png) { $('track').textContent = `${meta.name || 'unnamed'} (no image)`; return; }
+  if (!meta) { track = trackMeta = trackMask = null; trackNote = 'none'; return; }
+  if (!png) { trackNote = `${meta.name || 'unnamed'} (no image)`; return; }
   // The image arrives inside the message (base64), so no separate HTTP request can fail.
   const mask = new Image();
   try {
     await new Promise((ok, fail) => { mask.onload = ok; mask.onerror = fail; mask.src = `data:image/png;base64,${png}`; });
   } catch {
     if (n !== trackLoads) return;
-    $('track').textContent = `${meta.name || 'unnamed'} (image failed)`;
+    trackNote = `${meta.name || 'unnamed'} (image failed)`;
     logLine(`track image failed to decode: ${meta.name || 'unnamed'}`);
     return;
   }
   if (n !== trackLoads) return;
   trackMeta = meta; trackMask = mask;
   tintTrack();
-  $('track').textContent = meta.name || 'unnamed';
+  trackNote = meta.name || 'unnamed';
 }
 
 // ---------- canvas ----------
 function resize() {
   const dpr = window.devicePixelRatio || 1;
-  canvas.width = innerWidth * dpr; canvas.height = innerHeight * dpr;
+  canvas.width = innerWidth * dpr; canvas.height = (innerHeight - TOPBAR) * dpr;
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 }
-addEventListener('resize', resize); resize();
-addEventListener('wheel', (e) => {
-  if (e.target !== canvas) return; // let the panel and its log scroll normally
+addEventListener('resize', () => { resize(); keepPanelsOnScreen(); });
+resize();
+canvas.addEventListener('wheel', (e) => {
   scale = Math.min(800, Math.max(10, scale * Math.exp(-e.deltaY * 0.001)));
 }, { passive: true });
 
-// Drag to pan. Panning detaches the camera from the car until "Center camera back on car".
+// Drag to pan. Panning detaches the camera from the car until "Center camera on car".
 let cam = null; // null: follow the drawn car; {x, y}: fixed world point at the screen centre
 let drag = null;
-function setCam(c) {
-  cam = c;
-  $('camMode').textContent = cam ? 'free (dragged)' : 'following car';
-}
+function setCam(c) { cam = c; refreshSettings(); }
 canvas.addEventListener('pointerdown', (e) => {
   if (e.button !== 0) return;
+  closeMenu();
   const car = drawnPose();
   if (!cam) setCam(car ? { x: car.x, y: car.y } : { x: 0, y: 0 });
   drag = { x: e.clientX, y: e.clientY };
@@ -224,6 +366,428 @@ const endDrag = () => { drag = null; canvas.classList.remove('dragging'); };
 canvas.addEventListener('pointerup', endDrag);
 canvas.addEventListener('pointercancel', endDrag);
 
+// ---------- panels ----------
+// Each panel: title, menu group, optional header meta, build(body) once on open, update(body) every frame.
+// `available()` false greys it out in the menu with `note`.
+const PANELS = {
+  status:    { title: 'Status', group: 'status', w: 448, build: buildStatus, update: updateStatus },
+  heartbeat: { title: 'Heartbeat', group: 'status', w: 448, meta: () => '150 ms cutoff', build: buildHeartbeat, update: updateHeartbeat },
+  car:       { title: 'Car', group: 'status', w: 264, build: buildCar, update: updateCar },
+  topics:    { title: 'Topics', group: 'sensors', w: 400, meta: () => `${streams.size} topics`, build: buildTopics, update: updateTopics },
+  plots:     { title: 'Plots', group: 'sensors', w: 400, meta: () => `${opts.plotWindow} s`, build: buildPlots, update: updatePlots },
+  lidar:     { title: 'LiDAR', group: 'sensors', w: 264, available: () => false, note: 'no scan topic', build: () => {} },
+  camera:    { title: 'Camera', group: 'sensors', w: 360, available: () => false, note: 'no image topic', build: () => {} },
+  computer:  { title: 'Computer', group: 'machine', w: 448, available: () => false, note: 'needs server stats', build: () => {} },
+  settings:  { title: 'Settings', group: 'settings', w: 264, build: buildSettings },
+  sim:       { title: 'Sim settings', group: 'settings', w: 264, available: () => simMode(), note: 'sim only', build: buildSim },
+};
+const GROUPS = ['status', 'sensors', 'machine', 'settings'];
+
+function defaultLayout() {
+  const right = Math.max(INSET, innerWidth - INSET - 400);
+  return {
+    open: {
+      status: { x: INSET, y: TOPBAR + INSET },
+      heartbeat: { x: INSET, y: TOPBAR + INSET + 120 },
+      topics: { x: right, y: TOPBAR + INSET },
+      plots: { x: right, y: TOPBAR + INSET + 248 },
+    },
+    plotSel: ['/sim/odom', 'odometry'],
+  };
+}
+let layout = store.get(LAYOUT_KEY) || defaultLayout();
+layout.open ||= {}; layout.plotSel ||= [];
+const saveLayout = () => store.set(LAYOUT_KEY, layout);
+
+const els = {}; // id -> panel element
+let zTop = 10;
+const snap = (v) => Math.round(v / SNAP) * SNAP;
+const clampX = (x, w) => Math.min(Math.max(x, -w + 80), innerWidth - 80);
+const clampY = (y) => Math.min(Math.max(y, TOPBAR), innerHeight - 30); // the header always stays reachable
+
+function mountPanels() {
+  for (const id of Object.keys(PANELS)) {
+    const want = !!layout.open[id] && (PANELS[id].available ? PANELS[id].available() : true);
+    if (want && !els[id]) openPanelEl(id);
+    if (!want && els[id]) { els[id].remove(); delete els[id]; }
+  }
+  buildMenu();
+}
+
+function openPanelEl(id) {
+  const def = PANELS[id], L = layout.open[id];
+  const el = document.createElement('div');
+  el.className = 'panel' + (L.collapsed ? ' is-collapsed' : '');
+  el.dataset.id = id;
+  el.innerHTML = `<div class="panel__head">
+      <button class="iconbtn" data-a="collapse" aria-label="Collapse">${L.collapsed ? '▸' : '▾'}</button>
+      <span class="panel__title">${esc(def.title)}</span><span class="panel__meta"></span>
+      <button class="iconbtn" data-a="close" aria-label="Close">✕</button>
+    </div><div class="panel__body"></div><div class="panel__grip"></div>`;
+  place(el, L, def);
+  el.style.zIndex = ++zTop;
+  $('panels').appendChild(el);
+  els[id] = el;
+  def.build(el.querySelector('.panel__body'));
+  wirePanel(el, id);
+}
+
+function place(el, L, def) {
+  const w = L.w || def.w;
+  el.style.width = w + 'px';
+  el.style.left = clampX(L.x, w) + 'px';
+  el.style.top = clampY(L.y) + 'px';
+  // Height follows content until the user resizes; it never runs off the bottom of the screen.
+  el.style.height = L.h ? L.h + 'px' : '';
+  el.style.maxHeight = `calc(100vh - ${clampY(L.y)}px - ${INSET}px)`;
+}
+function keepPanelsOnScreen() { for (const [id, el] of Object.entries(els)) place(el, layout.open[id], PANELS[id]); }
+
+function wirePanel(el, id) {
+  const head = el.querySelector('.panel__head'), grip = el.querySelector('.panel__grip');
+  el.addEventListener('pointerdown', () => { el.style.zIndex = ++zTop; }, true);
+  head.addEventListener('click', (e) => {
+    const a = e.target.closest('button') && e.target.closest('button').dataset.a;
+    if (a === 'close') { delete layout.open[id]; saveLayout(); mountPanels(); }
+    if (a === 'collapse') {
+      const L = layout.open[id]; L.collapsed = !L.collapsed; saveLayout();
+      el.classList.toggle('is-collapsed', L.collapsed);
+      e.target.closest('button').textContent = L.collapsed ? '▸' : '▾';
+    }
+  });
+  head.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0 || e.target.closest('button')) return;
+    const ox = e.clientX - el.offsetLeft, oy = e.clientY - el.offsetTop;
+    head.setPointerCapture(e.pointerId);
+    el.classList.add('is-dragging');
+    const move = (ev) => {
+      const L = layout.open[id];
+      L.x = snap(ev.clientX - ox); L.y = snap(ev.clientY - oy);
+      place(el, L, PANELS[id]);
+    };
+    const up = () => {
+      head.removeEventListener('pointermove', move); head.removeEventListener('pointerup', up);
+      el.classList.remove('is-dragging'); saveLayout();
+    };
+    head.addEventListener('pointermove', move); head.addEventListener('pointerup', up);
+  });
+  grip.addEventListener('pointerdown', (e) => {
+    if (e.button !== 0) return;
+    e.stopPropagation();
+    const sx = e.clientX, sy = e.clientY, sw = el.offsetWidth, sh = el.offsetHeight;
+    grip.setPointerCapture(e.pointerId);
+    const move = (ev) => {
+      const L = layout.open[id];
+      L.w = Math.max(200, snap(sw + ev.clientX - sx));
+      L.h = Math.max(60, snap(sh + ev.clientY - sy));
+      place(el, L, PANELS[id]);
+    };
+    const up = () => { grip.removeEventListener('pointermove', move); grip.removeEventListener('pointerup', up); saveLayout(); };
+    grip.addEventListener('pointermove', move); grip.addEventListener('pointerup', up);
+  });
+}
+
+// "+ Add panel": closed panels open; an open one comes to front and flashes.
+function buildMenu() {
+  let html = '';
+  for (const g of GROUPS) {
+    html += `<div class="menu__group">${g}</div>`;
+    for (const [id, def] of Object.entries(PANELS)) {
+      if (def.group !== g) continue;
+      const ok = def.available ? def.available() : true;
+      html += `<button class="menu__item" role="menuitem" data-id="${id}" ${ok ? '' : 'aria-disabled="true"'}>
+        <span class="menu__check">${ok && layout.open[id] ? '✓' : ''}</span>${esc(def.title)}
+        ${ok ? '' : `<span class="menu__note">${esc(def.note)}</span>`}</button>`;
+    }
+  }
+  $('menu').innerHTML = html;
+}
+let cascade = 0;
+$('menu').addEventListener('click', (e) => {
+  const item = e.target.closest('.menu__item');
+  if (!item || item.getAttribute('aria-disabled') === 'true') return;
+  const id = item.dataset.id;
+  if (layout.open[id] && els[id]) {
+    const el = els[id];
+    el.style.zIndex = ++zTop;
+    el.classList.add('is-flash'); setTimeout(() => el.classList.remove('is-flash'), 600);
+  } else {
+    const off = (cascade++ % 5) * 24;
+    layout.open[id] = { x: snap(480 + off), y: snap(TOPBAR + 96 + off) };
+    saveLayout(); mountPanels();
+  }
+  closeMenu();
+});
+function closeMenu() { $('menuWrap').classList.remove('open'); $('addBtn').setAttribute('aria-expanded', 'false'); }
+$('addBtn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const open = !$('menuWrap').classList.contains('open');
+  buildMenu();
+  $('menuWrap').classList.toggle('open', open);
+  $('addBtn').setAttribute('aria-expanded', String(open));
+});
+addEventListener('pointerdown', (e) => { if (!e.target.closest('#menuWrap')) closeMenu(); });
+addEventListener('keydown', (e) => { if (e.key === 'Escape') closeMenu(); });
+$('resetLayout').onclick = () => {
+  for (const id of Object.keys(els)) { els[id].remove(); delete els[id]; }
+  layout = defaultLayout(); saveLayout(); mountPanels();
+};
+
+const body = (id) => els[id] && els[id].querySelector('.panel__body');
+const q = (b, sel) => b.querySelector(sel);
+
+// ---------- Status ----------
+function buildStatus(b) { b.innerHTML = '<div class="chain"></div>'; }
+function chainTiles() {
+  const l = link, sim = simMode();
+  const tiles = [];
+  tiles.push({ k: 'target', v: l ? (sim ? 'sim' : 'car') : '—', d: l ? (sim ? trackNote : (l.udp ? l.udp.host : 'address TBD')) : '', st: l ? 'ok' : 'warn' });
+  tiles.push({ k: 'server', v: serverUp ? 'live' : 'down', d: serverUp ? `ws :${location.port || 80}` : 'reconnecting', st: serverUp ? 'ok' : 'bad' });
+  tiles.push({ k: 'helper', v: helperUp ? 'live' : 'down', d: helperUp ? 'ws :8081' : 'reconnecting', st: helperUp ? 'ok' : 'bad' });
+  tiles.push({ k: 'link', v: l && l.connected ? 'connected' : 'not connected', d: l && l.udp ? `udp :${l.udp.port}` : '', st: l && l.connected ? 'ok' : 'bad' });
+  if (sim) tiles.push({ k: 'sim', v: l.sim, d: trackNote, st: l.sim === 'running' ? 'ok' : l.sim === 'starting' ? 'warn' : 'bad' });
+  // The first failure is broken; everything after it is unknown, so it is shown greyed, not as live.
+  let broken = false;
+  for (const t of tiles) {
+    if (broken) { t.st = 'stale'; t.v = '—'; t.d = ''; }
+    else if (t.st === 'bad') broken = true;
+  }
+  return tiles;
+}
+function updateStatus(b) {
+  const html = chainTiles().map((t) => `<div class="tile ${{ ok: '', warn: 'is-warn', bad: 'is-broken', stale: 'is-stale' }[t.st]}">
+      <div class="tile__k">${t.k}</div><div class="tile__v">${esc(t.v)}</div><div class="tile__d">${esc(t.d) || '&nbsp;'}</div></div>`)
+    .join('<span class="chain__arrow">→</span>');
+  const chain = q(b, '.chain');
+  if (chain.innerHTML !== html) chain.innerHTML = html;
+}
+
+// ---------- Heartbeat ----------
+function buildHeartbeat(b) {
+  b.innerHTML = `
+    <div class="split">
+      <div><div class="sub">we send</div><dl class="kv">
+        <dt>rate</dt><dd data-f="rate">—</dd>
+        <dt>last seq</dt><dd data-f="seq">—</dd>
+        <dt>sending</dt><dd data-f="sending">—</dd>
+        <dt>reason</dt><dd data-f="reason">—</dd></dl></div>
+      <div class="stack"><div class="sub" style="margin:0" data-f="reporter">car reports</div>
+        <div class="tbar" data-f="hbAge"><span>heartbeat age</span><span class="tbar__val">—</span>
+          <div class="tbar__track"><div class="tbar__fill"></div><div class="tbar__tick"></div></div></div>
+        <div class="tbar" data-f="teAge"><span>teleop age</span><span class="tbar__val">—</span>
+          <div class="tbar__track"><div class="tbar__fill"></div><div class="tbar__tick"></div></div></div>
+      </div>
+    </div>
+    <div class="strip strip--stopping" data-f="strip">STOPPING <small>· no report</small></div>
+    <button class="btn btn--danger btn--block" data-f="cutoff">Test cutoff</button>
+    <details class="log"><summary data-f="logsum">event log (0)</summary><ol data-f="log"></ol></details>`;
+  q(b, '[data-f=cutoff]').onclick = toggleCutoff;
+  renderLog();
+}
+const fmtAge = (s) => s === null || s === undefined ? '—' : s * 1000 > 9999 ? `${s.toFixed(1)} s` : `${Math.round(s * 1000)} ms`;
+function setBar(el, age) {
+  const none = age === null || age === undefined;
+  el.className = 'tbar ' + (none ? 'is-none' : age >= TIMEOUT_S ? 'is-bad' : age >= TIMEOUT_S / 2 ? 'is-warn' : '');
+  setText(q(el, '.tbar__val'), fmtAge(age));
+  q(el, '.tbar__fill').style.width = none ? '0' : `${Math.min(100, age / (2 * TIMEOUT_S) * 100)}%`;
+}
+const STOP_REASON = { heartbeat: 'heartbeat timeout', teleop: 'teleop timeout', idle: 'nothing received' };
+function carStop() {
+  const lk = state ? state.link : null;
+  if (!lk) return { stopping: true, reason: 'no report' };
+  return { stopping: !!lk.stopping, reason: lk.stopping ? STOP_REASON[lk.reason] || lk.reason : 'not stopping' };
+}
+function updateHeartbeat(b) {
+  const f = (n) => q(b, `[data-f=${n}]`);
+  if (sent && helperUp) {
+    f('rate').innerHTML = `${sent.count * 5} <span class="unit">Hz</span>`; // reports are 5 Hz, count is per report
+    setText(f('seq'), String(sent.last_seq));
+    setText(f('sending'), sent.sending ? 'yes' : 'no', sent.sending ? 'is-ok' : 'is-bad');
+    setText(f('reason'), sent.reason, sent.reason === 'ok' ? '' : 'is-warn');
+  } else {
+    setText(f('rate'), '—'); setText(f('seq'), '—');
+    setText(f('sending'), helperUp ? '—' : 'no helper', helperUp ? '' : 'is-bad'); setText(f('reason'), '—', '');
+  }
+  setText(f('reporter'), simMode() ? 'sim reports' : 'car reports');
+  const lk = state ? state.link : null;
+  setBar(f('hbAge'), lk ? lk.heartbeat_age : null);
+  setBar(f('teAge'), lk ? lk.teleop_age : null);
+  const st = carStop(), strip = f('strip');
+  const html = `${st.stopping ? 'STOPPING' : 'ARMED'} <small>· ${esc(st.reason)}</small>`;
+  if (strip.innerHTML !== html) { strip.innerHTML = html; strip.className = 'strip ' + (st.stopping ? 'strip--stopping' : 'strip--armed'); }
+  setText(f('cutoff'), cutoffOn ? 'Cutoff active · Resume heartbeat' : 'Test cutoff');
+}
+function renderLog() {
+  const b = body('heartbeat'); if (!b) return;
+  setText(q(b, '[data-f=logsum]'), `event log (${logLines.length})`);
+  const ol = q(b, '[data-f=log]');
+  ol.innerHTML = logLines.map(([t, s]) => `<li><time>${t}</time>${esc(s)}</li>`).join('');
+  ol.scrollTop = ol.scrollHeight;
+}
+function logLine(text) {
+  logLines.push([clock(), text]);
+  if (logLines.length > LOG_LINES) logLines.shift();
+  renderLog();
+}
+
+// ---------- Car ----------
+function buildCar(b) {
+  b.innerHTML = `<dl class="kv">
+    <dt>source</dt><dd data-f="source">—</dd>
+    <dt><span class="swatch" data-f="sw"></span><span data-f="poseLabel">pose</span></dt><dd data-f="pose">—</dd>
+    <dt data-sim><span class="swatch" style="background:var(--odom)"></span>odom</dt><dd data-sim data-f="odom">—</dd>
+    <dt data-sim>odom error</dt><dd data-sim data-f="err">—</dd></dl>`;
+}
+const fmtPose = (p) => p ? `${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${(p.yaw * 180 / Math.PI).toFixed(0)}°` : '—';
+function updateCar(b) {
+  const f = (n) => q(b, `[data-f=${n}]`), sim = simMode(), car = drawnPose(), ghost = sim && state ? state.estimate : null;
+  const fromSim = state ? state.source === 'sim' : sim;
+  setText(f('source'), state ? state.source : '—');
+  f('sw').style.background = css(fromSim ? '--car' : '--real');
+  f('sw').style.outline = fromSim ? '' : `1px solid ${css('--real-edge')}`;
+  setText(f('poseLabel'), sim ? 'true pose' : 'odom pose');
+  setText(f('pose'), fmtPose(car));
+  for (const el of b.querySelectorAll('[data-sim]')) el.style.display = sim ? '' : 'none';
+  if (sim) {
+    setText(f('odom'), fmtPose(ghost));
+    f('err').innerHTML = car && ghost ? `${Math.hypot(car.x - ghost.x, car.y - ghost.y).toFixed(3)} <span class="unit">m</span>` : '—';
+  }
+}
+
+// ---------- Topics ----------
+let topicsKey = '';
+function buildTopics(b) { topicsKey = ''; b.innerHTML = '<table class="topics"></table><div class="sub" style="margin:0">rates are as received by this page</div>'; }
+function updateTopics(b) {
+  const names = [...streams.keys()];
+  const key = names.join('|') + '#' + layout.plotSel.join('|');
+  const table = q(b, '.topics');
+  if (key !== topicsKey) {
+    topicsKey = key;
+    table.innerHTML = names.length ? names.map((n) => `<tr><td class="t" title="${esc(n)}">${esc(n)}</td><td class="ty">${esc(streams.get(n).type)}</td>
+      <td class="hz" data-hz="${esc(n)}">—</td><td><input type="checkbox" data-t="${esc(n)}" aria-label="plot ${esc(n)}" ${layout.plotSel.includes(n) ? 'checked' : ''}></td></tr>`).join('')
+      : '<tr><td class="empty">no topics yet: waiting for the bridge</td></tr>';
+    table.onchange = (e) => {
+      const t = e.target.dataset.t; if (!t) return;
+      layout.plotSel = layout.plotSel.filter((x) => x !== t);
+      if (e.target.checked) layout.plotSel.push(t);
+      saveLayout();
+      const pb = body('plots'); if (pb) buildPlots(pb);
+    };
+  }
+  for (const td of table.querySelectorAll('[data-hz]')) {
+    const s = streams.get(td.dataset.hz), stale = streamStale(s);
+    setText(td, stale ? '—' : streamHz(s).toFixed(1), 'hz' + (stale ? ' is-stale' : ''));
+  }
+}
+
+// ---------- Plots ----------
+let plotsKey = '';
+function buildPlots(b) {
+  plotsKey = '';
+  const sel = layout.plotSel.filter((n) => streams.has(n));
+  plotsKey = sel.map((n) => n + ':' + streams.get(n).fields.join(',')).join('|');
+  b.innerHTML = sel.length ? sel.map((n) => {
+    const s = streams.get(n);
+    return `<div class="plot"><div class="plot__head"><span class="plot__topic">${esc(n)}</span><span class="plot__meta" data-hz="${esc(n)}"></span></div>
+      <canvas data-plot="${esc(n)}"></canvas>
+      <div class="legend">${s.fields.map((f, i) => `<span><i class="${i >= 4 ? 'dashed' : ''}" style="background:var(--series-${i % 4 + 1});border-color:var(--series-${i % 4 + 1})"></i>${esc(f)}</span>`).join('')}</div></div>`;
+  }).join('') : '<div class="empty">tick topics in Topics to plot them</div>';
+}
+function updatePlots(b) {
+  const sel = layout.plotSel.filter((n) => streams.has(n));
+  const key = sel.map((n) => n + ':' + streams.get(n).fields.join(',')).join('|');
+  if (key !== plotsKey) buildPlots(b);
+  for (const el of b.querySelectorAll('[data-hz]')) {
+    const s = streams.get(el.dataset.hz);
+    el.textContent = streamStale(s) ? 'stale' : `${streamHz(s).toFixed(1)} Hz`;
+  }
+  for (const c of b.querySelectorAll('canvas[data-plot]')) drawPlot(c, streams.get(c.dataset.plot));
+}
+function drawPlot(c, s) {
+  const dpr = devicePixelRatio || 1, W = c.clientWidth, H = c.clientHeight;
+  if (!W || !H) return;
+  if (c.width !== Math.round(W * dpr) || c.height !== Math.round(H * dpr)) { c.width = Math.round(W * dpr); c.height = Math.round(H * dpr); }
+  const g = c.getContext('2d'); g.setTransform(dpr, 0, 0, dpr, 0, 0); g.clearRect(0, 0, W, H);
+  const t = nowS(), win = opts.plotWindow, t0 = t - win, x = (ts) => (ts - t0) / win * W;
+  // Vertical gridline every 1 s that moves with the data, plus one horizontal midline.
+  g.strokeStyle = css('--line'); g.lineWidth = 1;
+  for (let k = Math.ceil(t0); k <= t; k++) { const gx = Math.round(x(k)) + 0.5; g.beginPath(); g.moveTo(gx, 0); g.lineTo(gx, H); g.stroke(); }
+  g.beginPath(); g.moveTo(0, Math.round(H / 2) + 0.5); g.lineTo(W, Math.round(H / 2) + 0.5); g.stroke();
+  const pts = s.samples.filter((p) => p.t >= t0 - 0.5);
+  let lo = Infinity, hi = -Infinity;
+  for (const p of pts) for (const f of s.fields) { const v = p.v[f]; if (v !== undefined) { lo = Math.min(lo, v); hi = Math.max(hi, v); } }
+  if (!Number.isFinite(lo)) return;
+  if (hi - lo < 1e-9) { hi += 1; lo -= 1; }
+  const pad = (hi - lo) * 0.08; hi += pad; lo -= pad;
+  const y = (v) => H - (v - lo) / (hi - lo) * H;
+  s.fields.forEach((f, i) => {
+    g.strokeStyle = css(`--series-${i % 4 + 1}`); g.lineWidth = 1.5; g.lineJoin = 'round';
+    g.setLineDash(i >= 4 ? [4, 3] : []);
+    g.beginPath(); let started = false;
+    for (const p of pts) {
+      const v = p.v[f]; if (v === undefined) { started = false; continue; }
+      if (started) g.lineTo(x(p.t), y(v)); else { g.moveTo(x(p.t), y(v)); started = true; }
+    }
+    g.stroke();
+  });
+  g.setLineDash([]);
+  g.fillStyle = css('--ink-muted'); g.font = `10px ${css('--font-mono')}`;
+  g.fillText(hi.toFixed(2), 4, 11); g.fillText(lo.toFixed(2), 4, H - 4);
+}
+
+// ---------- Settings ----------
+function buildSettings(b) {
+  b.innerHTML = `
+    <div><div class="sub">driving</div><dl class="kv">
+      <dt>max speed m/s</dt><dd><input class="input" type="number" data-f="maxSpeed" min="0" max="10" step="0.1" style="width:64px"></dd></dl>
+      <div class="sub" style="margin:var(--space-2) 0 0">W/S or up/down, steer A/D or left/right; gamepad left stick and triggers</div></div>
+    <div><div class="sub">view</div><dl class="kv">
+      <dt>camera</dt><dd><div class="seg"><button data-cam="follow">follow</button><button data-cam="free">free</button></div></dd>
+      <dt>odom ghost</dt><dd><label class="check"><input type="checkbox" data-f="ghost"> <span data-f="ghostWord"></span></label></dd>
+      <dt>trail <span data-f="trailVal"></span></dt><dd><input class="range" type="range" min="0" max="60" step="5" data-f="trail"></dd>
+      <dt>plot window</dt><dd><div class="seg"><button data-win="20">20 s</button><button data-win="60">60 s</button></div></dd></dl></div>
+    <button class="btn btn--block" data-f="recenter">Center camera on car</button>
+    <div><div class="sub">connection</div><dl class="kv">
+      <dt>source</dt><dd><div class="seg"><button data-mode="sim">sim</button><button data-mode="real">real</button></div></dd></dl></div>`;
+  const f = (n) => q(b, `[data-f=${n}]`);
+  f('maxSpeed').value = opts.maxSpeed;
+  f('maxSpeed').oninput = (e) => { const v = parseFloat(e.target.value); opts.maxSpeed = Number.isFinite(v) && v >= 0 ? v : 1.0; };
+  f('ghost').onchange = (e) => { opts.ghost = e.target.checked; refreshSettings(); };
+  f('trail').oninput = (e) => { opts.trail = +e.target.value; refreshSettings(); };
+  f('recenter').onclick = () => setCam(null);
+  b.addEventListener('click', (e) => {
+    const t = e.target.closest('button'); if (!t) return;
+    if (t.dataset.cam === 'follow') setCam(null);
+    if (t.dataset.cam === 'free' && !cam) { const car = drawnPose(); setCam(car ? { x: car.x, y: car.y } : { x: 0, y: 0 }); }
+    if (t.dataset.win) { opts.plotWindow = +t.dataset.win; refreshSettings(); }
+    if (t.dataset.mode) switchMode(t.dataset.mode);
+  });
+  refreshSettings();
+}
+function refreshSettings() {
+  const b = body('settings'); if (!b) return;
+  const f = (n) => q(b, `[data-f=${n}]`);
+  const press = (sel, on) => { const el = q(b, sel); if (el) el.setAttribute('aria-pressed', String(on)); };
+  press('[data-cam=follow]', !cam); press('[data-cam=free]', !!cam);
+  press('[data-win="20"]', opts.plotWindow === 20); press('[data-win="60"]', opts.plotWindow === 60);
+  press('[data-mode=sim]', !!link && link.mode === 'sim'); press('[data-mode=real]', !!link && link.mode === 'real');
+  f('ghost').checked = opts.ghost; setText(f('ghostWord'), opts.ghost ? 'on' : 'off');
+  f('trail').value = opts.trail; f('trailVal').innerHTML = `<span class="unit">${opts.trail ? opts.trail + ' s' : 'off'}</span>`;
+}
+
+// ---------- Sim settings ----------
+function buildSim(b) {
+  b.innerHTML = `<div><dl class="kv"><dt>track</dt><dd><select class="select" id="trackIn"></select></dd></dl>
+    <div class="sub" style="margin:var(--space-2) 0 0">used the next time the sim starts</div></div>`;
+  fillTrackSelect($('trackIn'));
+  $('trackIn').onchange = () => { tracks.selected = $('trackIn').value; $('trackIn2').value = tracks.selected; sendServer({ type: 'sim', track: tracks.selected }); };
+}
+function fillTrackSelect(sel) {
+  if (!sel) return;
+  sel.replaceChildren(...tracks.names.map((n) => new Option(n, n)));
+  sel.value = tracks.names.includes(tracks.selected) ? tracks.selected : tracks.names[0];
+}
+
 // ---------- server websocket ----------
 let serverWs = null;
 function sendServer(msg) {
@@ -232,9 +796,9 @@ function sendServer(msg) {
 function connectServer() {
   const ws = new WebSocket(`ws://${location.host}/ws`);
   serverWs = ws;
-  ws.onopen = () => setText('serverWs', 'live', 'ok');
+  ws.onopen = () => { serverUp = true; };
   ws.onclose = () => {
-    setText('serverWs', 'reconnecting', 'bad');
+    serverUp = false;
     // Without the server we know nothing about the car: drop stale pose and stop the helper's UDP.
     state = null; link = null; onLink();
     setTimeout(connectServer, 1000);
@@ -250,13 +814,15 @@ function connectServer() {
 
 function onState(msg) {
   state = msg;
+  const names = TOPICS[msg.source === 'sim' ? 'sim' : 'car'];
+  for (const k of ['estimate', 'truth', 'link']) if (names[k]) ingest(names[k][0], names[k][1], msg[k]);
   const p = drawnPose();
   if (!p) return;
   const key = `${msg.source}/${simMode() ? 'truth' : 'estimate'}`;
   if (key !== trailKey) { trail = []; trailKey = key; }
-  const now = performance.now() / 1000;
+  const now = nowS();
   trail.push([p.x, p.y, now]);
-  while (trail.length && now - trail[0][2] > TRAIL_SECONDS) trail.shift();
+  while (trail.length && now - trail[0][2] > 60) trail.shift();
 }
 
 const simMode = () => !!link && link.mode === 'sim';
@@ -265,26 +831,20 @@ const drawnPose = () => state ? (simMode() ? state.truth : state.estimate) || nu
 
 let lastCarFound = false;
 let lastUdpKey = undefined;
+let lastSimMode = null;
 function onLink() {
   const l = link;
-  setText('mode', l ? l.mode : '-');
-  setText('conn', !l ? '-' : l.connected ? 'connected' : 'not connected', !l ? '' : l.connected ? 'ok' : 'bad');
-  setText('simState', l ? l.sim : '-', l && l.sim === 'running' ? 'ok' : l && l.sim === 'starting' ? 'warn' : 'muted');
-  $('setSim').classList.toggle('on', !!l && l.mode === 'sim');
-  $('setReal').classList.toggle('on', !!l && l.mode === 'real');
-  $('simOnly').style.display = simMode() ? '' : 'none';
-  $('reporter').textContent = simMode() ? 'sim (car_link)' : 'car';
   if (l && !l.connected) state = null; // no bridge, so the last pose is stale
-
   // Real mode with no car: say so prominently, but only the user switches back to sim.
-  $('nocar').style.display = l && l.mode === 'real' && !l.connected ? 'block' : 'none';
-
+  $('nocar').style.display = l && l.mode === 'real' && !l.connected ? 'flex' : 'none';
   // Toast only on the rising edge, and only while we're in sim (in real it's already in use).
   const found = !!l && !!l.car_found;
   if (found && !lastCarFound && simMode()) $('toast').style.display = 'flex';
   if (!found || (l && l.mode === 'real')) $('toast').style.display = 'none';
   lastCarFound = found;
-
+  // Sim settings exists only while connected to the sim.
+  if (simMode() !== lastSimMode) { lastSimMode = simMode(); mountPanels(); }
+  refreshSettings();
   // Tell the helper where to send UDP, but only when it changes.
   const udp = l ? l.udp : null;
   const key = JSON.stringify(udp || null);
@@ -296,30 +856,24 @@ function sendTarget() {
   sendHelper(udp ? { type: 'target', host: udp.host, port: udp.port } : { type: 'target', host: null });
 }
 
-function switchMode(mode, trackInput) {
-  if (mode === 'sim') {
-    const name = (trackInput || $('trackIn')).value;
-    sendServer({ type: 'sim', track: name || null }); // before the switch so the sim starts on it
-  }
+function switchMode(mode) {
+  if (mode === 'sim') sendServer({ type: 'sim', track: tracks.selected || null }); // before the switch so the sim starts on it
   sendServer({ type: 'switch', mode });
 }
-$('setSim').onclick = () => switchMode('sim');
-$('setReal').onclick = () => switchMode('real');
-$('toSim').onclick = () => switchMode('sim', $('trackIn2'));
-$('trackIn').onchange = () => { $('trackIn2').value = $('trackIn').value; };
-$('trackIn2').onchange = () => { $('trackIn').value = $('trackIn2').value; };
+$('toSim').onclick = () => switchMode('sim');
+$('trackIn2').onchange = () => { tracks.selected = $('trackIn2').value; if ($('trackIn')) $('trackIn').value = tracks.selected; };
 
 // The server lists the bundled tracks, so only a track that exists can be picked.
 function setTracks(names, selected) {
-  for (const id of ['trackIn', 'trackIn2']) {
-    const sel = $(id);
-    sel.replaceChildren(...names.map((n) => new Option(n, n)));
-    sel.value = names.includes(selected) ? selected : names[0];
-  }
+  tracks = { names, selected: names.includes(selected) ? selected : names[0] };
+  fillTrackSelect($('trackIn')); fillTrackSelect($('trackIn2'));
 }
-$('recenter').onclick = () => setCam(null);
 $('toastX').onclick = () => { $('toast').style.display = 'none'; };
-$('toastOpen').onclick = () => { $('settings').open = true; $('toast').style.display = 'none'; };
+$('toastOpen').onclick = () => {
+  if (!layout.open.settings) { layout.open.settings = { x: snap(480), y: snap(TOPBAR + 96) }; saveLayout(); mountPanels(); }
+  els.settings.style.zIndex = ++zTop;
+  $('toast').style.display = 'none';
+};
 
 // ---------- helper websocket ----------
 let helperWs = null;
@@ -332,15 +886,14 @@ function connectHelper() {
   const ws = new WebSocket('ws://localhost:8081');
   helperWs = ws;
   ws.onopen = () => {
-    setText('helperWs', 'live', 'ok');
+    helperUp = true;
     logLine('helper connected');
     sendTarget(); // a restarted helper knows nothing; give it the target straight away
   };
   ws.onclose = () => {
     if (lastSent !== 'down') logLine('helper disconnected');
     lastSent = 'down';
-    setText('helperWs', 'reconnecting', 'bad');
-    setText('hbSending', 'no (no helper)', 'bad');
+    helperUp = false;
     setTimeout(connectHelper, 1000);
   };
   ws.onmessage = (e) => {
@@ -350,35 +903,17 @@ function connectHelper() {
 }
 
 function onSent(m) {
-  setText('hbSending', m.sending ? 'yes' : 'no', m.sending ? 'ok' : 'bad');
-  setText('hbReason', m.reason, m.reason === 'ok' ? '' : 'warn');
-  setText('hbRate', String(m.count * 5)); // reports are 5 Hz, count is per report
-  setText('hbSeq', String(m.last_seq));
+  sent = m;
   cutoffOn = !!m.cutoff; // the helper's view is the truth for the button
-  renderCutoff();
   const now = `${m.sending}/${m.reason}`;
   if (now !== lastSent) logLine(m.sending ? 'sending' : `stopped: ${m.reason}`);
   lastSent = now;
 }
 
-function logLine(text) {
-  const log = $('log');
-  const lines = log.textContent ? log.textContent.split('\n') : [];
-  lines.push(`${clock()} ${text}`);
-  log.textContent = lines.slice(-LOG_LINES).join('\n');
-  log.scrollTop = log.scrollHeight;
-}
-
-function renderCutoff() {
-  const b = $('cutoff');
-  b.textContent = cutoffOn ? 'Cutoff active — resume heartbeat' : 'Test heartbeat cutoff';
-  b.classList.toggle('danger', cutoffOn);
-}
-$('cutoff').onclick = () => {
+function toggleCutoff() {
   cutoffOn = !cutoffOn; // optimistic; the next `sent` report confirms it
   sendHelper({ type: 'cutoff', on: cutoffOn });
-  renderCutoff();
-};
+}
 
 // Page heartbeat: the helper only sends UDP heartbeats while these keep arriving.
 let hbSeq = 0;
@@ -394,7 +929,7 @@ const typing = (e) => {
 addEventListener('keydown', (e) => {
   const k = e.key.toLowerCase();
   if (typing(e) || !DRIVE_KEYS[k] || e.metaKey || e.ctrlKey || e.altKey) return;
-  keys.add(k); e.preventDefault(); // arrows would otherwise scroll the panel
+  keys.add(k); e.preventDefault(); // arrows would otherwise scroll a panel
 });
 addEventListener('keyup', (e) => { keys.delete(e.key.toLowerCase()); });
 // A key released while the window is unfocused never sends keyup: drop everything so the car stops.
@@ -413,12 +948,8 @@ function gamepadInput() {
   return null;
 }
 
-function maxSpeed() {
-  const v = parseFloat($('maxSpeed').value);
-  return Number.isFinite(v) && v >= 0 ? v : 1.0;
-}
-
 let lastActive = -Infinity;
+let driving = false;
 setInterval(() => {
   let throttle = 0, steer = 0, active = false;
   if (keys.size) {
@@ -426,26 +957,17 @@ setInterval(() => {
     steer = (keys.has('a') || keys.has('arrowleft') ? 1 : 0) - (keys.has('d') || keys.has('arrowright') ? 1 : 0);
     active = true;
   } else {
-    const g = gamepadInput();
-    if (g) { throttle = g.throttle; steer = g.steer; active = true; }
+    const gp = gamepadInput();
+    if (gp) { throttle = gp.throttle; steer = gp.steer; active = true; }
   }
   const now = performance.now();
   if (active) lastActive = now;
-  else if (now - lastActive > TELEOP_TAIL_MS) { setDriving(false); return; } // idle: send nothing
-  const speed = active ? throttle * maxSpeed() : 0;
+  else if (now - lastActive > TELEOP_TAIL_MS) { driving = false; return; } // idle: send nothing
+  const speed = active ? throttle * opts.maxSpeed : 0;
   const steerRad = active ? Math.max(-1, Math.min(1, steer)) * MAX_STEER : 0;
   sendHelper({ type: 'teleop', speed, steer: steerRad });
-  setDriving(active);
+  driving = active;
 }, TELEOP_MS);
-
-let drivingShown = null;
-function setDriving(on) {
-  if (on === drivingShown) return;
-  drivingShown = on;
-  const el = $('driving');
-  el.textContent = on ? 'driving' : 'idle';
-  el.className = on ? 'active' : 'muted';
-}
 
 // ---------- hidden tab ----------
 // Browsers throttle timers in hidden tabs, so page heartbeats stop and the car stops by design.
@@ -462,10 +984,26 @@ document.addEventListener('visibilitychange', () => {
   bannerTimer = setTimeout(() => { b.style.display = 'none'; }, 4000);
 });
 
-// ---------- drawing ----------
-const fmt = (p) => p ? `${p.x.toFixed(2)}, ${p.y.toFixed(2)}, ${(p.yaw * 180 / Math.PI).toFixed(0)}°` : '-';
-const ms = (s) => (s === null || s === undefined ? '-' : `${Math.round(s * 1000)} ms`);
+// ---------- top bar ----------
+function setPill(el, st, v) {
+  const cls = 'pill' + (st ? ` pill--${st}` : '');
+  if (el.className !== cls) el.className = cls;
+  setText(q(el, '.pill__v'), v);
+}
+function updateTopbar() {
+  const sim = simMode();
+  const tgt = $('pillTarget');
+  setPill(tgt, '', link ? (sim ? `sim · ${trackNote}` : `car · ${link.udp ? link.udp.host : 'not found'}`) : '—');
+  q(tgt, '.pill__dot').style.background = link ? css(sim ? '--accent' : '--car') : '';
+  setPill($('pillDrive'), driving ? 'ok' : '', driving ? 'driving' : 'idle');
+  const lk = state ? state.link : null, hb = $('pillHb');
+  if (!lk) setPill(hb, '', 'no report');
+  else if (lk.reason === 'heartbeat' || (lk.heartbeat_age !== null && lk.heartbeat_age > TIMEOUT_S)) setPill(hb, 'bad', 'LOST');
+  else if (sent && sent.sending) setPill(hb, 'ok', `ok ${sent.count * 5} Hz`);
+  else setPill(hb, 'warn', sent ? sent.reason : 'not sending');
+}
 
+// ---------- drawing ----------
 function drawCar(p, fill, stroke, dashed) {
   ctx.save();
   ctx.translate(p.x, p.y); ctx.rotate(p.yaw);
@@ -475,12 +1013,12 @@ function drawCar(p, fill, stroke, dashed) {
   ctx.lineTo(CAR.back, CAR.half); ctx.closePath();
   if (fill) { ctx.fillStyle = fill; ctx.fill(); }
   ctx.setLineDash(dashed ? [0.04, 0.03] : []);
-  ctx.lineWidth = 2 / scale; ctx.strokeStyle = stroke; ctx.stroke();
+  ctx.lineWidth = (dashed ? 1.5 : 2) / scale; ctx.strokeStyle = stroke; ctx.stroke();
   ctx.restore();
 }
 
 function frame() {
-  const w = innerWidth, h = innerHeight;
+  const w = innerWidth, h = innerHeight - TOPBAR;
   const sim = simMode();
   const car = drawnPose();
   const ghost = sim && state ? state.estimate : null;
@@ -494,15 +1032,16 @@ function frame() {
   ctx.save();
   ctx.translate(w / 2, h / 2); ctx.scale(scale, -scale); ctx.translate(-cx, -cy);
 
-  // 1 m grid over the visible area, axes through the origin.
+  // 1 m grid over the visible area; every 5 m and the axes a step darker.
   const hw = w / 2 / scale, hh = h / 2 / scale;
   ctx.lineWidth = 1 / scale; ctx.setLineDash([]);
+  const grid = css('--grid'), axis = css('--grid-axis');
   for (let x = Math.floor(cx - hw); x <= cx + hw; x++) {
-    ctx.strokeStyle = css(x === 0 ? '--axis' : '--grid');
+    ctx.strokeStyle = x % 5 === 0 ? axis : grid;
     ctx.beginPath(); ctx.moveTo(x, cy - hh); ctx.lineTo(x, cy + hh); ctx.stroke();
   }
   for (let y = Math.floor(cy - hh); y <= cy + hh; y++) {
-    ctx.strokeStyle = css(y === 0 ? '--axis' : '--grid');
+    ctx.strokeStyle = y % 5 === 0 ? axis : grid;
     ctx.beginPath(); ctx.moveTo(cx - hw, y); ctx.lineTo(cx + hw, y); ctx.stroke();
   }
 
@@ -517,37 +1056,30 @@ function frame() {
     ctx.restore();
   }
 
-  if (trail.length > 1) {
-    ctx.strokeStyle = css(fromSim ? '--trail' : '--trail-real'); ctx.lineWidth = 2 / scale; ctx.setLineDash([]);
-    ctx.beginPath(); ctx.moveTo(trail[0][0], trail[0][1]);
-    for (const [x, y] of trail) ctx.lineTo(x, y);
-    ctx.stroke();
+  const shown = opts.trail ? trail.filter((p) => nowS() - p[2] <= opts.trail) : [];
+  if (shown.length > 1) {
+    ctx.strokeStyle = fromSim ? css('--car') : css('--real'); ctx.globalAlpha = 0.55;
+    ctx.lineWidth = 2 / scale; ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(shown[0][0], shown[0][1]);
+    for (const [x, y] of shown) ctx.lineTo(x, y);
+    ctx.stroke(); ctx.globalAlpha = 1;
   }
 
   if (car) drawCar(car, fill, edge, false);
-  if (ghost && $('ghost').checked) drawCar(ghost, null, css('--ghost'), true);
+  if (ghost && opts.ghost) drawCar(ghost, null, css('--odom'), true);
   ctx.restore();
 
-  // Panel readouts.
-  setText('source', state ? state.source : '-');
-  $('carSw').style.background = fill;
-  $('carSw').style.outline = fromSim ? '' : `1px solid ${edge}`;
-  $('poseLabel').textContent = sim ? 'true' : 'odom';
-  setText('pose', fmt(car));
-  if (sim) {
-    setText('odom', fmt(ghost));
-    setText('err', car && ghost ? `${Math.hypot(car.x - ghost.x, car.y - ghost.y).toFixed(3)} m` : '-');
+  updateTopbar();
+  for (const [id, el] of Object.entries(els)) {
+    const def = PANELS[id];
+    if (def.meta) setText(q(el, '.panel__meta'), def.meta());
+    if (def.update && !layout.open[id].collapsed) def.update(q(el, '.panel__body'));
   }
-  const lk = state ? state.link : null;
-  setText('lkHb', lk ? ms(lk.heartbeat_age) : '-');
-  setText('lkTe', lk ? ms(lk.teleop_age) : '-');
-  setText('lkStop', lk ? (lk.stopping ? 'yes' : 'no') : '-', lk ? (lk.stopping ? 'bad' : 'ok') : '');
-  setText('lkReason', lk ? lk.reason : '-', lk && lk.reason !== 'ok' ? 'warn' : '');
   requestAnimationFrame(frame);
 }
 
+mountPanels();
 onLink();
-renderCutoff();
 connectServer();
 connectHelper();
 requestAnimationFrame(frame);
